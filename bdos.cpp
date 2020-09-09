@@ -40,9 +40,9 @@ void BDOS::init() {
   ram.writeByte(ENTRY, JP);
   ram.writeWord(ENTRY + 1, BDOSCODE + 0x06);
 
-  // IOBYTE - Points to Console */
+  // IOBYTE - Points to Console
   ram.writeByte(IOBYTE, 0x3D);
-  // Current drive/user - A:/0 */
+  // Current drive/user - A:/0
   ram.writeByte(TDRIVE, 0x00);
 
   // BDOS dispatcher (FBASE1)
@@ -246,9 +246,8 @@ void BDOS::call(uint16_t port) {
       */
 #ifdef DEBUG
       // Show unimplemented BDOS calls only when debugging
-      Serial.print("\r\nUnimplemented BDOS call.\r\n");
-      Serial.print("C = 0x");
-      Serial.print(port, 16);
+      Serial.print("\r\nUnimplemented BDOS call 0x");
+      Serial.print(cpu.regC(), 16);
       Serial.print("\r\n");
       cpu.trace();
 #endif

@@ -1,5 +1,5 @@
 /**
-  bios.cpp - BIOS emulator
+  bios.cpp - CP/M 2.2 compatible Basic Input / Output System (BIOS)
 
   Copyright (C) 2020 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -18,6 +18,7 @@
 */
 
 #include "bios.h"
+#include "ccp.h"
 
 BIOS::BIOS(I8080 cpu, RAM ram) {
   this->cpu = cpu;
@@ -33,17 +34,20 @@ void BIOS::init() {
   for (uint8_t i = 0; i < 17; i++) {
     offset = i * 3;
     // BIOS jump vectors
-    ram.writeByte(BIOSCODE + offset, JP);
+    ram.writeByte(BIOSCODE + offset, 0xC3);               // JP
     ram.writeWord(BIOSCODE + offset + 1, BIOSCODE + 0x0100 + offset);
     // BIOS routines
-    ram.writeByte(BIOSCODE + 0x0100 + offset, OUTa);
+    ram.writeByte(BIOSCODE + 0x0100 + offset,     0xD3);  // OUT A
     ram.writeByte(BIOSCODE + 0x0100 + offset + 1, i);
-    ram.writeByte(BIOSCODE + 0x0100 + offset + 2, RET);
+    ram.writeByte(BIOSCODE + 0x0100 + offset + 2, 0xC9);  // RET
   }
 
   // Patch in a JP to WBOOT at location 0x0000
-  ram.writeByte(0x0000, JP);
-  ram.writeWord(0x0001, WBOOT);
+  //ram.writeByte(0x0000, JP);
+  //ram.writeWord(0x0001, WBOOT);
+
+  // Load CCP
+  loadCCP();
 
 #ifdef DEBUG
   ram.hexdump(BIOSCODE, offset);
@@ -51,87 +55,116 @@ void BIOS::init() {
 #endif
 }
 
-void BIOS::call(uint16_t port) {
-  switch (port) {
+void BIOS::signon() {
+  Serial.print("\r\n64K CP/M v2.2 (eCPM 0.1)\r\n");
+}
 
-    case 0x00:
-      // BOOT: Ends CPM
-      cpu.state = 0;
+void BIOS::gocpm() {
+  // Patch in a JP to WBOOT at location 0x0000
+  ram.writeByte(0x0000, 0xC3);  // JP
+  ram.writeWord(0x0001, WBOOT);
+  //  Patch in a JP to the BDOS entry at location 0x0005
+  ram.writeByte(ENTRY, 0xC3);   // JP
+  ram.writeWord(ENTRY + 1, BDOSCODE + 0x06);
+  // Last loged disk number
+  cpu.regC(ram.readByte(TDRIVE));
+  // Jump to CCP
+  cpu.jump(CCPCODE);
+}
+
+void BIOS::loadCCP() {
+  ram.write(CCPCODE, CCP_BIN, CCP_BIN_len);
+}
+
+void BIOS::call(uint16_t code) {
+  switch (code) {
+    case 0x00:  // BOOT
+      // Print signon message and go to CCP
+      signon();
+      // Clear IOBYTE and TDRIVE
+      ram.writeByte(IOBYTE, 0x00);  // 0x3D
+      ram.writeByte(TDRIVE, 0x00);
+      // Go to CP/M
+      gocpm();
       break;
 
-    case 0x01:
-      // WBOOT: Back to CCP
+    case 0x01:  // WBOOT
+      // Back to CCP
+      // TODO print warm boot message
+      loadCCP();
+      // Go to CP/M
+      gocpm();
       break;
 
-    case 0x02:
-      // CONST: Console status
+    case 0x02:  // CONST
+      // Console status to register A
       cpu.regA(Serial.available() ? 0xff : 0x00);
       break;
 
-    case 0x03:
-      // CONIN: Console input
+    case 0x03:  // CONIN
+      // Console character input to register A
       while (!Serial.available()) { }
       cpu.regA(Serial.read());
       break;
 
-    case 0x04:
-      // CONOUT Console output
+    case 0x04:  // CONOUT
+      // Console device output character in C
       Serial.write((char)(cpu.regC() & 0x7F));
       break;
 
-    case 0x05:
-      // LIST List output
+    case 0x05:  // LIST
+      // List device output character in C
       break;
 
-    case 0x06:
-      // PUNCH/AUXOUT Punch output
+    case 0x06:  // PUNCH
+      // Punch device output character in C
       break;
 
-    case 0x07:
-      // READER Reader input (0x1A = device not implemented)
+    case 0x07:  // READER
+      // Reader character input to A (0x1A = device not implemented)
       cpu.regA(0x1A);
       break;
 
-    case 0x08:
-      // HOME Home disk head
+    case 0x08:  // HOME
+      // Move disk to home position
       break;
 
-    case 0x09:
-      // SELDSK Select disk drive
+    case 0x09:  // SELDSK
+      // Select disk given by register C
       cpu.regHL(0x0000);
       break;
 
-    case 0x0A:
-      // SETTRK Set track number
+    case 0x0A:  // SETTRK
+      // Set track address given by C
       break;
 
-    case 0x0B:
-      // SETSEC Set sector number
+    case 0x0B:  // SETSEC
+      // Set sector number given by C
       break;
 
-    case 0x0C:
-      // SETDMA Set DMA address
+    case 0x0C:  // SETDMA
+      // Set dma address given by register BC
       cpu.regHL(cpu.regBC());
       //dmaAddr = cpu.regBC();
       break;
 
-    case 0x0D:
-      // READ Read selected sector
+    case 0x0D:  // READ
+      // Read next disk record (disk/trk/sec/dma set)
       cpu.regA(0x00);
       break;
 
-    case 0x0E:
-      // WRITE Write selected sector
+    case 0x0E:  // WRITE
+      // Write next disk record (disk/trk/sec/dma set)
       cpu.regA(0x00);
       break;
 
-    case 0x0F:
-      // LISTST Get list device status
+    case 0x0F:  // LISTST
+      // Return list device status in A
       cpu.regA(0xFF);
       break;
 
-    case 0x10:
-      // SECTRAN Sector translate
+    case 0x10:  // SECTRAN
+      // Translate sector BC using table at DE
       cpu.regHL(cpu.regBC());  // HL=BC=No translation (1:1)
       break;
 
@@ -139,7 +172,7 @@ void BIOS::call(uint16_t port) {
 #ifdef DEBUG
       // Show unimplemented BIOS calls only when debugging
       Serial.print("\r\nUnimplemented BIOS call: 0x");
-      Serial.print(port, 16);
+      Serial.print(code, 16);
       Serial.print("\r\n");
       cpu.trace();
 #endif

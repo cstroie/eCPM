@@ -1,5 +1,5 @@
 /**
-  bios.h - BIOS emulator
+  bios.h - CP/M 2.2 compatible Basic Input / Output System (BIOS)
 
   Copyright (C) 2020 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -31,9 +31,12 @@ class BIOS {
     BIOS(I8080 cpu, RAM ram);
     ~BIOS();
     void init();
-    void call(uint16_t port);
+    void signon();
+    void call(uint16_t code);
 
   private:
+    void  gocpm();
+    void  loadCCP();
     I8080 cpu;
     RAM   ram;
 

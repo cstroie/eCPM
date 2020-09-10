@@ -1,5 +1,5 @@
 /**
-  bdos.cpp - BDOS emulator
+  bdos.cpp - CP/M 2.2 compatible Basic Disk Operating System (BDOS)
 
   Copyright (C) 2020 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -26,17 +26,6 @@
 #include "i8080.h"
 #include "ram.h"
 
-// BDOS function calls
-enum BDOS_CALLS {BDOS_WBOOT, BDOS_GETCON, BDOS_OUTCON, BDOS_GETRDR, BDOS_PUNCH,
-                 BDOS_LIST, BDOS_DIRCIO, BDOS_GETIOB, BDOS_SETIOB, BDOS_PRTSTR,
-                 BDOS_RDBUFF, BDOS_GETCSTS, BDOS_GETVER, BDOS_RSTDSK, BDOS_SETDSK,
-                 BDOS_OPENFIL, BDOS_CLOSEFIL, BDOS_GETFST, BDOS_GETNXT, BDOS_DELFILE,
-                 BDOS_READSEQ, BDOS_WRTSEQ, BDOS_FCREATE, BDOS_RENFILE, BDOS_GETLOG,
-                 BDOS_GETCRNT, BDOS_PUTDMA, BDOS_GETALOC, BDOS_WRTPRTD, BDOS_GETROV,
-                 BDOS_SETATTR, BDOS_GETPARM, BDOS_GETUSER, BDOS_RDRANDOM, BDOS_WTRANDOM,
-                 BDOS_FILESIZE, BDOS_SETRAN, BDOS_LOGOFF, BDOS_RTN_0, BDOS_RTN_1, BDOS_WTSPECL,
-                };
-
 class BDOS {
   public:
     BDOS(I8080 cpu, RAM ram);
@@ -46,6 +35,11 @@ class BDOS {
   private:
     I8080 cpu;
     RAM   ram;
+    uint8_t   cDrive = 0;         // Current drive
+    uint8_t   cUser  = 0;         // Current user
+    uint16_t  addrDMA = TBUFF;    // DMA address
+    uint16_t  rwoVector = 0x0000; // Read-only / Read-write vector
+    uint16_t  logVector = 0x0000; // Logged drives vector
 };
 
 #endif /* CPM_H */

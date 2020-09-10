@@ -1,5 +1,5 @@
 /**
-  bdos.cpp - BDOS emulator
+  bdos.cpp - CP/M 2.2 compatible Basic Disk Operating System (BDOS)
 
   Copyright (C) 2020 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -33,22 +33,13 @@ void BDOS::init() {
   ram.write(BDOSCODE, cpmSerialNo, 6);
 
   // BDOS entry (FBASE)
-  ram.writeByte(BDOSCODE + 6, JP);
+  ram.writeByte(BDOSCODE + 6, 0xC3);          // JP
   ram.writeWord(BDOSCODE + 7, BDOSCODE + 0x0100);
 
-  //  Patch in a JP to the BDOS entry at location 0x0005
-  ram.writeByte(ENTRY, JP);
-  ram.writeWord(ENTRY + 1, BDOSCODE + 0x06);
-
-  // IOBYTE - Points to Console
-  ram.writeByte(IOBYTE, 0x3D);
-  // Current drive/user - A:/0
-  ram.writeByte(TDRIVE, 0x00);
-
   // BDOS dispatcher (FBASE1)
-  ram.writeByte(BDOSCODE + 0x0100, INa);
+  ram.writeByte(BDOSCODE + 0x0100,     0xDB); // IN A
   ram.writeByte(BDOSCODE + 0x0100 + 1, 0x00);
-  ram.writeByte(BDOSCODE + 0x0100 + 2, RET);
+  ram.writeByte(BDOSCODE + 0x0100 + 2, 0xC9); // RET
 
 #ifdef DEBUG
   ram.hexdump(BDOSCODE, 16);
@@ -57,81 +48,75 @@ void BDOS::init() {
 }
 
 void BDOS::call(uint16_t port) {
-  uint8_t  b, count;
-  char c;
-  uint16_t w;
+  uint16_t  w;
+  uint8_t   b, count;
+  char      c;
 
   // HL is reset by the BDOS
   cpu.regHL(0x0000);
 
   switch (cpu.regC()) {
-    case BDOS_WBOOT:
-      // WBOOT: System reset
-      // Doesn't return. Reloads CP/M.
-      // Same as call to "BOOT"
-      cpu.state = 0;
+    case 0x00:  // WBOOT
+      // System reset
+      cpu.jump(WBOOT);
       break;
 
-    case BDOS_GETCON:
-      // GETCON: Console input
-      // Get a char from the console
-      // Return: A=Char
-      while (!Serial.available()) {}
+    case 0x01:  // GETCON
+      // Function to get a character from the console device.
+      //cpu.jump(CONIN);
+      while (!Serial.available()) { }
       c = Serial.read();
-      Serial.write(c);
       cpu.regHL(c);
-      break;
+      if (c == 0x0A or c == 0x0D or c == 0x09 or c == 0x08 or c >= ' ')
+        cpu.regE(c);
+      else
+        // A regular control char so don't echo
+        break;
 
-    case BDOS_OUTCON:
-      // OUTCON: Console output
-      // E = Char
-      // Send the char in E to the console
+    case 0x02:  // OUTCON
+      // Function to output (E) to the console device and expand tabs if necessary.
+      //cpu.jump(CONOUT);
       Serial.write((char)(cpu.regE() & 0x7F));
       break;
 
-    case BDOS_GETRDR:
-      // GETRDR: Auxiliary (Reader) input
-      // Returns: A=Char
+    case 0x03:  // GETRDR
+      // Function to get a character from the tape reader device.
+      //cpu.jump(READER);
       cpu.regHL(0x1A);
       break;
 
-    case BDOS_PUNCH:
-      // PUNCH: Auxiliary (Punch) output
+    case 0x04:  // PUNCH
+      // Auxiliary (Punch) output
+      cpu.jump(PUNCH);
       break;
 
-    case BDOS_LIST:
-      // LIST: Printer output
+    case 0x05:  // LIST
+      // Printer output
+      cpu.jump(LIST);
       break;
 
-    case BDOS_DIRCIO:
-      // DIRCIO: Direct console IO
-      // E = 0xFF : Checks for char available and returns it, or 0x00 if none (read)
-      // E = char : Outputs char (write)
-      // Return: A=Char or 0x00 (on read)
+    case 0x06:  // DIRCIO
+      // Function to perform direct console i/o. If (C) contains (FF)
+      // then this is an input request. Otherwise we are to output (C).
       if (cpu.regE() == 0xFF)
         cpu.regHL(Serial.available() ? Serial.read() : 0x00);
       else
         Serial.write((char)(cpu.regE() & 0x7F));
       break;
 
-    case BDOS_GETIOB:
-      // GETIOB: Get IOBYTE
-      // Get the system IOBYTE
-      // Return: A = IOBYTE
+    case 0x07:  // GETIOB
+      // Function to return the i/o byte.
       cpu.regHL(ram.readByte(IOBYTE));
       break;
 
-    case BDOS_SETIOB: // TODO not C ?
-      // SETIOB: Set IOBYTE
-      // E = IOBYTE
-      // Set the system IOBYTE to E
+    case 0x08:  // SETIOB
+      // Function to set the i/o byte.
       ram.writeByte(IOBYTE, cpu.regE());
       break;
 
-    case BDOS_PRTSTR:
-      // PRTSTR: Output string
-      // DE = Address of string
-      // Send the $ terminated string pointed by (DE) to the screen
+    case 0x09:  // PRTSTR
+      // Function to print the character string pointed to by (DE)
+      // on the console device. The string ends with a '$'.
       w = cpu.regDE();
       b = ram.readByte(w++);
       while (b != '$') {
@@ -141,11 +126,11 @@ void BDOS::call(uint16_t port) {
       cpu.regDE(w);
       break;
 
-    case BDOS_RDBUFF:
-      // RDBUFF: Buffered input
+    case 0x0A:  // RDBUFF
+      // Function to execute a buffered read.
       // DE = Address of buffer
       // Read (DE) bytes from the console
-      // Return: A = Number os chars read
+      // Return: A = Number of chars read
       // (DE) = First char
       // Get the number of characters to read
       w = cpu.regDE();
@@ -214,29 +199,59 @@ void BDOS::call(uint16_t port) {
       Serial.write('\r');
       break;
 
-    case BDOS_GETCSTS:
-      // GETCSTS: Get console status
-      // Return: A=0x00 or 0xFF
-      cpu.regHL(Serial.available() ? 0xff : 0x00);
+    case 0x0B:  // GETCSTS
+      // Function to interigate the console device.
+      cpu.regHL(Serial.available() ? 0xFF : 0x00);
       break;
 
-    case BDOS_GETVER:
-      // GETVER: Get version number
+    case 0x0C:  // GETVER
+      // Function to return the current cp/m version number.
       // Return: B=H=system type, A=L=version number
-      cpu.regHL(0x22);
+      cpu.regHL(0x0022);
       break;
 
-    case BDOS_GETUSER:
-      // GETUSER: Get/Set user code
+    case 0x0D:  // RSTDSK
+      // Function to reset the disk system.
+      cDrive = 0;           // Select drive 'A'
+      rwoVector = 0x0000;   // Clear write protect vector
+      logVector = 0x0001;   // Reset log in vector
+      addrDMA = TBUFF;      // Setup default DMA address
+      //HL = _CheckSUB(); // TODO Checks if there's a $$$.SUB on the boot disk
+      cpu.regHL(0x0000);
+      break;
+
+    case 0x0E:  // SETDSK
+      // Function to set the active disk number.
+      if (cDrive != cpu.regE())
+        logVector = logVector | (1 << cpu.regE());
+      break;
+
+    case 0x18:  // GETLOG
+      // Function to return the login vector.
+      cpu.regHL(logVector);
+      break;
+
+    case 0x19:  // GETCRNT
+      // Function to return the current disk assignment.
+      cpu.regHL(0x00);
+      break;
+
+    case 0x1A:  // PUTDMA
+      // Function to set the dma address.
+      addrDMA = cpu.regDE();
+      cpu.regBC(addrDMA);
+      cpu.jump(SETDMA);
+      break;
+
+    case 0x20:  // GETUSER
       // Function to get or set the user number. If (E) was (FF)
       // then this is a request to return the current user number.
       // Else set the user number from (E).
       if (cpu.regE() == 0xFF)
-        cpu.regHL(ram.readByte(TDRIVE) & 0x0F);
+        cpu.regHL(cUser & 0x000F);
       else
-        // _SetUser(DE);
-        // Make user dir
-        ram.writeByte(TDRIVE, (ram.readByte(TDRIVE) & 0xF0) | (cpu.regE() & 0x0F));
+        // TODO Make user dir
+        cUser = cpu.regE() & 0x0F;
       break;
 
 

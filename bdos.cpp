@@ -243,6 +243,25 @@ void BDOS::call(uint16_t port) {
       cpu.jump(SETDMA);
       break;
 
+    case 0x1C:  // WRTPRTD
+      // Function to write protect the current disk.
+      logVector = logVector | (1 << cDrive);
+      break;
+
+    case 0x1D:  // GETROV
+      // Function to return the read-only status vector.
+      cpu.regHL(rwoVector);
+      break;
+
+    case 0x1E:  // SETATTR
+      // Function to set the file attributes (read-only, system).
+      break;
+
+    case 0x1F:  // GETPARM
+      // Function to return the address of the disk parameter block for the current drive.
+      cpu.regHL(DPBADDR);
+      break;
+
     case 0x20:  // GETUSER
       // Function to get or set the user number. If (E) was (FF)
       // then this is a request to return the current user number.

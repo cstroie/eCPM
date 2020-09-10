@@ -29,6 +29,8 @@
 #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00)
 #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
 
+#define DPBADDR     (BIOSDATA + 0x40)
+
 #define TBASE       (0x0100)        // TPA - Transient Program Area
 #define CBASE       (CCPCODE)       // Used for sanity checks
 #define FBASE       (BDOSCODE + 6)  // Used for sanity checks

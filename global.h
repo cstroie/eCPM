@@ -58,13 +58,6 @@
 #define LISTST      (BIOSCODE + 0x2D)
 #define SECTRN      (BIOSCODE + 0x30)
 
-// Some instructions
-#define JP          (0xC3)
-#define CALL        (0xCD)
-#define RET         (0xC9)
-#define INa         (0xDB)  // Triggers a BIOS call
-#define OUTa        (0xD3)  // Triggers a BDOS call
-
 // Command codes that are sent to the emulator via a OUT (xxx),A instruction
 // to handle the BIOS low level console & disk I/O emulation
 #define EMU_EXIT    (0x00)

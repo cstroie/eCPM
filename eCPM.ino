@@ -27,10 +27,6 @@
 #include "bios.h"
 #include "bdos.h"
 
-#include "tst8080_com.h"
-#include "8080exm_com.h"
-#include "demo_com.h"
-
 // Some declarations
 void callBIOS(int port, int value);
 void callBDOS(int port);
@@ -89,10 +85,9 @@ void callBDOS(int port) {
 void setup() {
   // SPI
   SPI.begin();
-  
+
   // Serial port configuration
   Serial.begin(115200);
-
 
   // Init the SPI RAM
   // FIXME This breaks the SPI
@@ -102,17 +97,15 @@ void setup() {
   bdos.init();
 
   // Load some data
-  ram.write(0x0100, TST8080_COM, TST8080_COM_len);
+  //ram.write(0x0100, TST8080_COM, TST8080_COM_len);
   //ram.write(0x0100, DEMO_COM, DEMO_COM_len);
   //ram.write(0x0100, __8080EXM_COM, __8080EXM_COM_len);
 
   // RAM hex dump
   //ram.hexdump(0x0000, 0x0200);
 
-
-  cpu.jump(0x0100);
-  //Serial.println(cpu.instruction());
-  //cpu.trace();
+  // Start BIOS
+  cpu.jump(BIOSCODE);
 }
 
 /**
@@ -124,5 +117,5 @@ void loop() {
     //cpu.trace();
   }
 
-  //delay(10);
+  //delay(100);
 }

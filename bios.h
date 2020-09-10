@@ -26,6 +26,24 @@
 #include "i8080.h"
 #include "ram.h"
 
+struct DPB_t {
+  union {
+    struct {
+      uint16_t  spt;  // Sectors per track
+      uint8_t   bsh;  // Data allocation "Block Shift Factor"
+      uint8_t   blm;  // Data allocation Block Mask
+      uint8_t   exm;  // Extent Mask
+      uint16_t  dsm;  // Total storage capacity of the disk drive
+      uint16_t  drm;  // Number of the last directory entry
+      uint8_t   al0;  // Allocation 0
+      uint8_t   al1;  // Allocation 1
+      uint16_t  cks;  // Check area Size
+      uint16_t  off;  // Number of system reserved tracks at the beginning of the disk
+    };
+    uint8_t buf[16];
+  };
+};
+
 class BIOS {
   public:
     BIOS(I8080 cpu, RAM ram);

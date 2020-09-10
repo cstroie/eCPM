@@ -26,6 +26,42 @@
 #include "i8080.h"
 #include "ram.h"
 
+struct FCB_t  {
+  union {
+    struct {
+      uint8_t dr;     // Drive. 0 for default, 1-16 for A-P.
+      uint8_t fn[8];  // Filename, 7-bit ASCII.
+      uint8_t tp[3];  // Filetype, 7-bit ASCII.
+      uint8_t ex;     // Current extent.
+      uint8_t s1;     // Reserved.
+      uint8_t s2;     // Current extent, high byte.
+      uint8_t rc;
+      uint8_t al[16]; // File allocation.
+      uint8_t cr;     // Current record within extent.
+      uint8_t r0;     // Random access record number.
+      uint8_t r1;     // Random access record number.
+      uint8_t r2;     // Random access record number.
+    };
+    uint8_t buf[36];
+  };
+};
+
+struct DIR_t {
+  union {
+    struct {
+      uint8_t uu;     // User number. 0-15
+      uint8_t fn[8];  // Filename
+      uint8_t tp[3];  // Filetype
+      uint8_t ex;     // Extent counter, low byte - takes values from 0-31
+      uint8_t s1;     // Extent counter, high byte.
+      uint8_t s2;     // Reserved, set to 0.
+      uint8_t rc;     // Number of records used in this extent, low byte.
+      uint8_t al[16]; // Allocation. Each AL is the number of a block on the disc.
+    };
+    uint8_t buf[32];
+  };
+};
+
 class BDOS {
   public:
     BDOS(I8080 cpu, RAM ram);

@@ -21,6 +21,7 @@
 #define BDOS_H
 
 #include "Arduino.h"
+#include <SD.h>
 //#include <SdFat.h>
 // Need to specify the namespace for SdFat
 //using namespace sdfat;
@@ -83,7 +84,15 @@ class BDOS {
     bool      sdSelect(uint8_t drive);
     uint32_t  sdFileSize(char* fname);
     uint8_t   sdSeqRead(char* fname, uint32_t fpos);
-    
+    uint8_t   sdSeqWrite(char* fname, uint32_t fpos);
+    bool      sdCreate(char* fname);
+    bool      sdDelete(char* fname);
+    bool      sdRename(char* fname, char* newname);
+    bool      sdExtend(char* fname, uint32_t fpos);
+
+    void      ledOn();
+    void      ledOff();
+
     uint8_t   cDrive = 0;         // Current drive
     uint8_t   tDrive = 0;         // Temporary drive
     uint8_t   cUser  = 0;         // Current user
@@ -96,6 +105,7 @@ class BDOS {
     char      fName[128];         // Filename
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
+    File      file;
 
     uint16_t  result;             // Result from BDOS functions
 };

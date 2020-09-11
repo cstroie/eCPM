@@ -48,6 +48,13 @@ void BDOS::init() {
 #endif
 }
 
+void BDOS::ledOn() {
+  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
+}
+void BDOS::ledOff() {
+  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+}
+
 void BDOS::bdosError(uint8_t err) {
   Serial.print("Bdos Err On ");
   Serial.print(cDrive + 'A');
@@ -293,7 +300,9 @@ void BDOS::call(uint16_t port) {
 
 
     case 0x14:  // READSEQ
-      // Read a file sequentially
+      // Function to execute a sequential read of the specified record number.
+      result = 0xFF;
+      // Get the FCB address
       ramFCB = cpu.regDE();
       // Create the FCB object
       ram.read(ramFCB, fcb.buf, 36);
@@ -330,7 +339,117 @@ void BDOS::call(uint16_t port) {
       cpu.regHL(result);
       break;
 
+    case 0x15:  // WRTSEQ
+      // Function to write the net sequential record.
+      result = 0xFF;
+      // Get the FCB address
+      ramFCB = cpu.regDE();
+      // Create the FCB object
+      ram.read(ramFCB, fcb.buf, 36);
+      // Compute the file seek position
+      fPos = ((fcb.s2 & MaxS2) * BlkS2 * BlkSZ) +
+             (fcb.ex * BlkEX * BlkSZ) +
+             (fcb.cr * BlkSZ);
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // TODO Check if the drive is R/O
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        // Read one block
+        result = sdSeqWrite(fName, fPos);
+        // Check the result
+        if (!result) {
+          // Reset unmodified flag
+          fcb.s2 &= 0x7F;
+          // Read succeeded, adjust FCB
+          fcb.cr++;
+          if (fcb.cr > MaxCR) {
+            fcb.cr = 1;
+            fcb.ex++;
+          }
+          if (fcb.ex > MaxEX) {
+            fcb.ex = 0;
+            fcb.s2++;
+          }
+          if ((fcb.s2 & 0x7F) > MaxS2)
+            // TODO Not sure what to do
+            result = 0xfe;
+        }
+        // TODO Return error 4 if write protected
+        // bdosError(4);
+      }
+      // Write the FCB back into RAM
+      ram.write(ramFCB, fcb.buf, 36);
+      // Return the result in HL
+      cpu.regHL(result);
+      break;
 
+    case 0x16:  // FCREATE
+      // Create a file function.
+      result = 0xFF;
+      // Get the FCB address
+      ramFCB = cpu.regDE();
+      // Create the FCB object
+      ram.read(ramFCB, fcb.buf, 36);
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // TODO Check if the drive is R/O
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        // Create the file
+        if (sdCreate(fName)) {
+          // Initializes the FCB
+          fcb.ex = 0x00;
+          fcb.s1 = 0x00;
+          fcb.s2 = 0x00;
+          fcb.rc = 0x00;
+          // Clean allocation
+          for (uint8_t i = 0; i < 16; i++)
+            fcb.al[i] = 0x00;
+          fcb.cr = 0x00;
+          result = 0x00;
+        }
+        // TODO Return error 4 if write protected
+        // bdosError(4);
+      }
+      // Write the FCB back into RAM
+      ram.write(ramFCB, fcb.buf, 36);
+      // Return the result in HL
+      cpu.regHL(result);
+      break;
+
+    case 0x17:  // RENFILE
+      // Function to rename a file.
+      result = 0xFF;
+      // Get the FCB address
+      ramFCB = cpu.regDE();
+      // Create the FCB object
+      ram.read(ramFCB, fcb.buf, 36);
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // TODO Check if the drive is R/O
+        uint16_t ramNewFCB = ramFCB + 16;
+        // Prevents rename from moving files among drives
+        ram.writeByte(ramNewFCB, ram.readByte(ramFCB));
+        // Create the new FCB object
+        FCB_t newfcb;
+        ram.read(ramNewFCB, newfcb.buf, 36);
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        // Get the new filename on SD card
+        char newName[128];
+        fcb2fname(newfcb, newName);
+        // Rename the file
+        if (sdRename(fName, newName))
+          result = 0x00;
+        // TODO Return error 4 if write protected
+        // bdosError(4);
+      }
+      // Write the FCB back into RAM
+      ram.write(ramFCB, fcb.buf, 36);
+      // Return the result in HL
+      cpu.regHL(result);
+      break;
 
     case 0x18:  // GETLOG
       // Function to return the login vector.
@@ -480,12 +599,12 @@ bool BDOS::sdSelect(uint8_t drive) {
   // Adjust the drive letter
   disk[0] += drive;
   // Check for directory existence
-  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
-  if (File f = SD.open((char*)disk, FILE_READ)) {
-    result = f.isDirectory();
-    f.close();
+  ledOn();
+  if (file = SD.open((char*)disk, FILE_READ)) {
+    result = file.isDirectory();
+    file.close();
   }
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+  ledOff();
   return result;
 }
 
@@ -493,26 +612,28 @@ uint32_t BDOS::sdFileSize(char* fname) {
   uint32_t len = -1;
   // Open the file and get the size
   digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
-  if (File f = SD.open((char*)fname, FILE_READ)) {
-    len = f.size();
-    f.close();
+  if (file = SD.open((char*)fname, FILE_READ)) {
+    len = file.size();
+    file.close();
   }
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+  ledOff();
   return len;
 }
 
 uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[BlkSZ];
-
-  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
-  File f = SD.open((char*)fname, FILE_READ);
-  if (f) {
-    if (f.seek(fpos)) {
+  ledOn();
+  // Open the file
+  file = SD.open((char*)fname, FILE_READ);
+  // Check if the file has been open
+  if (file) {
+    // Seek
+    if (file.seek(fpos)) {
       // Clear the buffer
-      memset(buf, 0x1a, BlkSZ);
+      memset(buf, 0x1A, BlkSZ);
       // Read from file
-      if (f.read(&buf[0], BlkSZ)) {
+      if (file.read(&buf[0], BlkSZ)) {
         // Write into RAM
         ram.write(ramDMA, buf, BlkSZ);
         result = 0x00;
@@ -524,12 +645,97 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
       // Seek error
       result = 0x01;
     // Close the file
-    // TODO Optimize
-    f.close();
+    file.close();
   } else
     // Open error
     result = 0x10;
+  ledOff();
+  return result;
+}
 
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
+  uint8_t result = 0xFF;
+  uint8_t buf[BlkSZ];
+  ledOn();
+  // Check if we need to extend the file
+  if (sdExtend((char*)fname, fpos))
+    // Open the file
+    file = SD.open((char*)fname, FILE_WRITE);
+  // Check if the file has been open
+  if (file) {
+    // Seek
+    if (file.seek(fpos)) {
+      // Read from RAM
+      ram.read(ramDMA, buf, BlkSZ);
+      // Write to file
+      if (file.write(&buf[0], BlkSZ))
+        result = 0x00;
+      else
+        // Write error
+        result = 0x01;
+    } else
+      // Seek error
+      result = 0x01;
+    // Close the file
+    file.close();
+  } else
+    // Open error
+    result = 0x10;
+  ledOff();
+  return result;
+}
+
+bool BDOS::sdCreate(char* fname) {
+  bool result = false;
+  ledOn();
+  file = SD.open((char*)fname, FILE_WRITE);
+  if (file) {
+    file.close();
+    result = true;
+  }
+  ledOff();
+  return result;
+}
+
+bool BDOS::sdDelete(char* fname) {
+  ledOn();
+  SD.remove((char*)fname);
+  ledOff();
+  return true;
+}
+
+bool BDOS::sdRename(char* fname, char* newname) {
+  bool result = false;
+  ledOn();
+  file = SD.open((char*)fname, FILE_WRITE);
+  if (file) {
+    // FIXME
+    //if (file.rename((char*)newname)) {
+    //  file.close();
+    //  result = true;
+    //}
+  }
+  ledOff();
+  return result;
+}
+
+bool BDOS::sdExtend(char* fname, uint32_t fpos) {
+  bool result = true;
+  ledOn();
+  // Open the file for write
+  if (file = SD.open(fname, FILE_WRITE)) {
+    // Check if we need to seek beyond end
+    if (fpos > file.size()) {
+      file.seek(file.size());
+      for (uint32_t i = 0; i < fpos - file.size(); i++)
+        if (file.write((uint8_t)0) != 1) {
+          result = false;
+          break;
+        }
+    }
+    file.close();
+  } else
+    result = false;
+  ledOff();
   return result;
 }

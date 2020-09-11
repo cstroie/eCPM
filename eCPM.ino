@@ -17,6 +17,14 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <SPI.h>
+//#include <SdFat.h>
+
+#include <SD.h>
+
+// Need to specify the namespace for SdFat
+//using namespace sdfat;
+
 // Global parameters
 #include "global.h"
 // Configuration
@@ -83,11 +91,21 @@ void callBDOS(int port) {
   Main Arduino setup function
 */
 void setup() {
+  // LED configuration
+  pinMode(BUILTIN_LED, OUTPUT);
+  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+  // Serial port configuration
+  Serial.begin(SERIAL_SPEED);
   // SPI
   SPI.begin();
+  // SD card
+  Serial.print("\r\nInitializing SD card... ");
+  if (!SD.begin(SS)) {
+    Serial.println(" failed!");
+    while (1);
+  }
+  Serial.println(" done.");
 
-  // Serial port configuration
-  Serial.begin(115200);
 
   // Init the SPI RAM
   // FIXME This breaks the SPI

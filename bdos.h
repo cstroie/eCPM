@@ -21,6 +21,10 @@
 #define BDOS_H
 
 #include "Arduino.h"
+//#include <SdFat.h>
+// Need to specify the namespace for SdFat
+//using namespace sdfat;
+
 #include "global.h"
 #include "config.h"
 #include "i8080.h"
@@ -29,7 +33,7 @@
 struct FCB_t  {
   union {
     struct {
-      uint8_t dr;     // Drive. 0 for default, 1-16 for A-P.
+      uint8_t dr;     // Drive: 0 for default, 1-16 for A-P.
       uint8_t fn[8];  // Filename, 7-bit ASCII.
       uint8_t tp[3];  // Filetype, 7-bit ASCII.
       uint8_t ex;     // Current extent.
@@ -68,14 +72,32 @@ class BDOS {
     ~BDOS();
     void init();
     void call(uint16_t port);
+
+    uint8_t selDrive(uint8_t drive);
+    bool    fcb2fname(FCB_t fcb, char* fname);
   private:
     I8080 cpu;
     RAM   ram;
+    void      bdosError(uint8_t err);
+
+    bool      sdSelect(uint8_t drive);
+    uint32_t  sdFileSize(char* fname);
+    uint8_t   sdSeqRead(char* fname, uint32_t fpos);
+    
     uint8_t   cDrive = 0;         // Current drive
+    uint8_t   tDrive = 0;         // Temporary drive
     uint8_t   cUser  = 0;         // Current user
-    uint16_t  addrDMA = TBUFF;    // DMA address
+    uint16_t  ramDMA = TBUFF;     // DMA address
+    uint16_t  ramFCB;             // FCB address
     uint16_t  rwoVector = 0x0000; // Read-only / Read-write vector
     uint16_t  logVector = 0x0000; // Logged drives vector
+
+    FCB_t     fcb;                // FCB object
+    char      fName[128];         // Filename
+    uint32_t  fSize;              // File size
+    uint32_t  fPos;               // File position (seek)
+
+    uint16_t  result;             // Result from BDOS functions
 };
 
 #endif /* CPM_H */

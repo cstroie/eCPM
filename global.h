@@ -77,5 +77,14 @@
 #define EMU_WRITE   (0x0C)
 #define EMU_READER  (0x0D)
 
+/* CP/M disk definitions */
+#define BlkSZ 128  // CP/M block size
+#define BlkEX 128 // Number of blocks on an extension
+#define ExtSZ (BlkSZ * BlkEX)
+#define BlkS2 4096  // Number of blocks on a S2 (module)
+#define MaxEX 31  // Maximum value the EX field can take
+#define MaxS2 15  // Maximum value the S2 (modules) field can take - Can be set to 63 to emulate CP/M Plus
+#define MaxCR 128 // Maximum value the CR field can take
+#define MaxRC 128 // Maximum value the RC field can take
 
 #endif /* GLOBAL_H */

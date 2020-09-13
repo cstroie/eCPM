@@ -51,31 +51,34 @@ class BIOS {
     void init();
     void call(uint16_t code);
 
-    void boot();
-    void wboot();
-    void consts();
-    void conin();
-    void conout();
-    void list();
-    void punch();
-    void reader();
-    void home();
-    void seldsk();
-    void settrk();
-    void setsec();
-    void setdma();
-    void read();
-    void write();
-    void listst();
-    void sectran();
+    void    boot();
+    void    wboot();
+    uint8_t consts();
+    uint8_t conin();
+    void    conout();
+    void    conout(uint8_t c);
+    void    list();
+    void    list(uint8_t c);
+    void    punch();
+    void    punch(uint8_t c);
+    uint8_t reader();
+    void    home();
+    void    seldsk();
+    void    settrk();
+    void    setsec();
+    void    setdma();
+    uint8_t read();
+    uint8_t write();
+    uint8_t listst();
+    void    sectran();
 
   private:
-    void  signon();
-    void  gocpm();
-    void  loadCCP();
-    I8080 *cpu;
-    RAM   *ram;
-
+    void    signon();
+    void    gocpm();
+    void    loadCCP();
+    I8080   *cpu;
+    RAM     *ram;
+    uint8_t result;
 };
 
 #endif /* BIOS_H */

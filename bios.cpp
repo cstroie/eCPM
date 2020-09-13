@@ -178,32 +178,49 @@ void BIOS::wboot() {
 }
 
 // Console status to register A
-void BIOS::consts() {
-  cpu->regA(Serial.available() ? 0xFF : 0x00);
+uint8_t BIOS::consts() {
+  result = Serial.available() ? 0xFF : 0x00;
+  cpu->regA(result);
+  return result;
 }
 
 // Console character input to register A
-void BIOS::conin() {
+uint8_t BIOS::conin() {
   while (!Serial.available()) { }
-  cpu->regA(Serial.read());
+  result = Serial.read();
+  cpu->regA(result);
+  return result;
 }
 
 // Console device output character in C
 void BIOS::conout() {
-  Serial.write((char)(cpu->regC() & 0x7F));
+  conout(cpu->regC());
+}
+void BIOS::conout(uint8_t c) {
+  Serial.write((char)(c & 0x7F));
 }
 
 // List device output character in C
 void BIOS::list() {
+  list(cpu->regC());
+}
+void BIOS::list(uint8_t c) {
+  Serial.write((char)(c & 0x7F));
 }
 
 // Punch device output character in C
 void BIOS::punch() {
+  punch(cpu->regC());
+}
+void BIOS::punch(uint8_t c) {
+  Serial.write((char)(c & 0x7F));
 }
 
 // Reader character input to A (0x1A = device not implemented)
-void BIOS::reader() {
-  cpu->regA(0x1A);
+uint8_t BIOS::reader() {
+  result = 0x1A;
+  cpu->regA(result);
+  return result;
 }
 
 // Move disk to home position
@@ -230,18 +247,24 @@ void BIOS::setdma() {
 }
 
 // Read next disk record (disk/trk/sec/dma set)
-void BIOS::read() {
-  cpu->regA(0x00);
+uint8_t BIOS::read() {
+  result = 0x00;
+  cpu->regA(result);
+  return result;
 }
 
 // Write next disk record (disk/trk/sec/dma set)
-void BIOS::write() {
-  cpu->regA(0x00);
+uint8_t BIOS::write() {
+  result = 0x00;
+  cpu->regA(result);
+  return result;
 }
 
 // Return list device status in A
-void BIOS::listst() {
-  cpu->regA(0xFF);
+uint8_t BIOS::listst() {
+  result = 0xFF;
+  cpu->regA(result);
+  return result;
 }
 
 // Translate sector BC using table at DE

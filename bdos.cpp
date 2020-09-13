@@ -95,8 +95,7 @@ void BDOS::call(uint16_t port) {
 
     case 0x01:  // GETCON
       // Function to get a character from the console device.
-      bios->conin();
-      c = cpu->regA();
+      c = bios->conin();
       cpu->regHL(c);
       if (c == 0x0A or c == 0x0D or c == 0x09 or c == 0x08 or c >= ' ')
         cpu->regE(c);
@@ -106,44 +105,36 @@ void BDOS::call(uint16_t port) {
 
     case 0x02:  // OUTCON
       // Function to output (E) to the console device and expand tabs if necessary.
-      cpu->regC(cpu->regE());
-      bios->conout();
+      bios->conout(cpu->regE());
       break;
 
     case 0x03:  // GETRDR
       // Function to get a character from the tape reader device.
-      bios->reader();
-      cpu->regHL(cpu->regA());
+      cpu->regHL(bios->reader());
       break;
 
     case 0x04:  // PUNCH
       // Auxiliary (Punch) output
-      cpu->regA(cpu->regE());
-      bios->punch();
+      bios->punch(cpu->regE());
       break;
 
     case 0x05:  // LIST
       // Printer output
-      cpu->regA(cpu->regE());
-      bios->list();
+      bios->list(cpu->regE());
       break;
 
     case 0x06:  // DIRCIO
       // Function to perform direct console i/o. If (C) contains (FF)
       // then this is an input request. Otherwise we are to output (C).
       if (cpu->regE() == 0xFF) {
-        bios->consts();
-        if (cpu->regA() == 0xFF) {
-          bios->conin();
-          cpu->regHL(cpu->regA());
-        }
+        if (bios->consts() == 0xFF)
+          cpu->regHL(bios->conin());
         else
           cpu->regHL(0x00);
       }
       else {
         // TODO outcon()
-        cpu->regE(cpu->regC());
-        bios->conout();
+        bios->conout(cpu->regE());
       }
       break;
 
@@ -244,8 +235,7 @@ void BDOS::call(uint16_t port) {
 
     case 0x0B:  // GETCSTS
       // Function to interigate the console device.
-      bios->consts();
-      cpu->regHL(cpu->regA());
+      cpu->regHL(bios->consts());
       break;
 
     case 0x0C:  // GETVER

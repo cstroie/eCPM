@@ -60,23 +60,6 @@
 #define LISTST      (BIOSCODE + 0x2D)
 #define SECTRN      (BIOSCODE + 0x30)
 
-// Command codes that are sent to the emulator via a OUT (xxx),A instruction
-// to handle the BIOS low level console & disk I/O emulation
-#define EMU_EXIT    (0x00)
-#define EMU_CONOUT  (0x01)
-#define EMU_LIST    (0x02)
-#define EMU_PUNCH   (0x03)
-#define EMU_CONIN   (0x04)
-#define EMU_CONST   (0x05)
-#define EMU_SETDMA  (0x06)
-#define EMU_SETTRK  (0x07)
-#define EMU_SETSEC  (0x08)
-#define EMU_HOME    (0x09)
-#define EMU_SETDSK  (0x0A)
-#define EMU_READ    (0x0B)
-#define EMU_WRITE   (0x0C)
-#define EMU_READER  (0x0D)
-
 /* CP/M disk definitions */
 #define BlkSZ 128  // CP/M block size
 #define BlkEX 128 // Number of blocks on an extension

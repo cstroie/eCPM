@@ -73,9 +73,9 @@ void BDOS::bdosError(uint8_t err) {
   }
   Serial.print("\r\n");
   // Wait for a keypress
-  while (!Serial.available()) { }
+  bios->conin();
   // Always reboot on these errors.
-  cpu->jump(WBOOT);
+  bios->wboot();
 }
 
 
@@ -90,14 +90,13 @@ void BDOS::call(uint16_t port) {
   switch (cpu->regC()) {
     case 0x00:  // WBOOT
       // System reset
-      cpu->jump(WBOOT);
+      bios->wboot();;
       break;
 
     case 0x01:  // GETCON
       // Function to get a character from the console device.
-      //cpu->jump(CONIN);
-      while (!Serial.available()) { }
-      c = Serial.read();
+      bios->conin();
+      c = cpu->regA();
       cpu->regHL(c);
       if (c == 0x0A or c == 0x0D or c == 0x09 or c == 0x08 or c >= ' ')
         cpu->regE(c);
@@ -107,33 +106,45 @@ void BDOS::call(uint16_t port) {
 
     case 0x02:  // OUTCON
       // Function to output (E) to the console device and expand tabs if necessary.
-      //cpu->jump(CONOUT);
-      Serial.write((char)(cpu->regE() & 0x7F));
+      cpu->regC(cpu->regE());
+      bios->conout();
       break;
 
     case 0x03:  // GETRDR
       // Function to get a character from the tape reader device.
-      //cpu->jump(READER);
-      cpu->regHL(0x1A);
+      bios->reader();
+      cpu->regHL(cpu->regA());
       break;
 
     case 0x04:  // PUNCH
       // Auxiliary (Punch) output
-      cpu->jump(PUNCH);
+      cpu->regA(cpu->regE());
+      bios->punch();
       break;
 
     case 0x05:  // LIST
       // Printer output
-      cpu->jump(LIST);
+      cpu->regA(cpu->regE());
+      bios->list();
       break;
 
     case 0x06:  // DIRCIO
       // Function to perform direct console i/o. If (C) contains (FF)
       // then this is an input request. Otherwise we are to output (C).
-      if (cpu->regE() == 0xFF)
-        cpu->regHL(Serial.available() ? Serial.read() : 0x00);
-      else
-        Serial.write((char)(cpu->regE() & 0x7F));
+      if (cpu->regE() == 0xFF) {
+        bios->consts();
+        if (cpu->regA() == 0xFF) {
+          bios->conin();
+          cpu->regHL(cpu->regA());
+        }
+        else
+          cpu->regHL(0x00);
+      }
+      else {
+        // TODO outcon()
+        cpu->regE(cpu->regC());
+        bios->conout();
+      }
       break;
 
     case 0x07:  // GETIOB
@@ -233,7 +244,8 @@ void BDOS::call(uint16_t port) {
 
     case 0x0B:  // GETCSTS
       // Function to interigate the console device.
-      cpu->regHL(Serial.available() ? 0xFF : 0x00);
+      bios->consts();
+      cpu->regHL(cpu->regA());
       break;
 
     case 0x0C:  // GETVER
@@ -463,7 +475,7 @@ void BDOS::call(uint16_t port) {
       // Function to set the dma address.
       ramDMA = cpu->regDE();
       cpu->regBC(ramDMA);
-      cpu->jump(SETDMA);
+      bios->setdma();
       break;
 
 

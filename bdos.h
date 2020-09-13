@@ -81,8 +81,10 @@ class BDOS {
     I8080 *cpu;
     RAM   *ram;
     BIOS  *bios;
-    
+
     void      bdosError(uint8_t err);
+    void      readFCB();
+    void      writeFCB();
 
     bool      sdSelect(uint8_t drive);
     uint32_t  sdFileSize(char* fname);
@@ -102,12 +104,14 @@ class BDOS {
     uint16_t  ramDMA = TBUFF;     // DMA address
     uint16_t  ramFCB;             // FCB address
     uint16_t  rwoVector = 0x0000; // Read-only / Read-write vector
+    uint16_t  alcVector = 0x0000; // Allocation vector
     uint16_t  logVector = 0x0000; // Logged drives vector
 
     FCB_t     fcb;                // FCB object
     char      fName[128];         // Filename
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
+    uint32_t  fRec;               // File record (random seek)
     File      file;
 
     uint16_t  result;             // Result from BDOS functions

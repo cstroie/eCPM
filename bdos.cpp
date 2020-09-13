@@ -154,7 +154,7 @@ void BDOS::call(uint16_t port) {
       w = cpu->regDE();
       b = ram->readByte(w++);
       while (b != '$') {
-        Serial.print((char)(b & 0x7F));
+        bios->conout(b);
         b = ram->readByte(w++);
       }
       cpu->regDE(w);
@@ -173,8 +173,7 @@ void BDOS::call(uint16_t port) {
       count = 0;
       // Very simple line input
       while (b) {
-        while (!Serial.available()) {}
-        c = Serial.read();
+        c = bios->conin();
         if (c == 3 && count == 0) {
           // ^C
           Serial.write("^C");
@@ -196,13 +195,13 @@ void BDOS::call(uint16_t port) {
         }
         else if (c == 18) {
           // ^R
-          Serial.write("#\r\n  ");
+          Serial.write("#\r\n   ");
           for (uint8_t j = 1; j <= count; ++j)
-            Serial.write((char)ram->readByte(w + j));
+            bios->conout(ram->readByte(w + j));
         }
         else if (c == 21) {
           // ^U
-          Serial.write("#\r\n  ");
+          Serial.write("#\r\n   ");
           w = cpu->regDE();
           b = ram->readByte(w);
           w++;
@@ -220,7 +219,7 @@ void BDOS::call(uint16_t port) {
         else if (c < 0x20 || c > 0x7E)
           // Invalid character
           continue;
-        Serial.write((char)(c & 0x7F));
+        bios->conout(c);
         ++count;
         ram->writeByte(w + count, c);
         // Reached the expected count
@@ -230,7 +229,7 @@ void BDOS::call(uint16_t port) {
       // Save the number of characters read
       ram->writeByte(w, count);
       // Gives a visual feedback that read ended
-      Serial.write('\r');
+      bios->conout('\r');
       break;
 
     case 0x0B:  // GETCSTS
@@ -268,10 +267,8 @@ void BDOS::call(uint16_t port) {
     case 0x0F:  // OPENFIL
       // Function to open a specified file.
       result = 0xFF;
-      // Get the FCB address
-      ramFCB = cpu->regDE();
-      // Create the FCB object
-      ram->read(ramFCB, fcb.buf, 36);
+      // Read the FCB from RAM
+      readFCB();
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
@@ -302,10 +299,8 @@ void BDOS::call(uint16_t port) {
     case 0x14:  // READSEQ
       // Function to execute a sequential read of the specified record number.
       result = 0xFF;
-      // Get the FCB address
-      ramFCB = cpu->regDE();
-      // Create the FCB object
-      ram->read(ramFCB, fcb.buf, 36);
+      // Read the FCB from RAM, address in DE
+      readFCB();
       // Compute the file seek position
       fPos = ((fcb.s2 & MaxS2) * BlkS2 * BlkSZ) +
              (fcb.ex * BlkEX * BlkSZ) +
@@ -334,7 +329,7 @@ void BDOS::call(uint16_t port) {
         }
       }
       // Write the FCB back into RAM
-      ram->write(ramFCB, fcb.buf, 36);
+      writeFCB();
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -342,44 +337,45 @@ void BDOS::call(uint16_t port) {
     case 0x15:  // WRTSEQ
       // Function to write the net sequential record.
       result = 0xFF;
-      // Get the FCB address
-      ramFCB = cpu->regDE();
-      // Create the FCB object
-      ram->read(ramFCB, fcb.buf, 36);
+      // Read the FCB from RAM, address in DE
+      readFCB();
       // Compute the file seek position
       fPos = ((fcb.s2 & MaxS2) * BlkS2 * BlkSZ) +
              (fcb.ex * BlkEX * BlkSZ) +
              (fcb.cr * BlkSZ);
       // Select the drive
       if (sdSelect(fcb.dr)) {
-        // TODO Check if the drive is R/O
-        // Get the filename on SD card
-        fcb2fname(fcb, fName);
-        // Read one block
-        result = sdSeqWrite(fName, fPos);
-        // Check the result
-        if (!result) {
-          // Reset unmodified flag
-          fcb.s2 &= 0x7F;
-          // Read succeeded, adjust FCB
-          fcb.cr++;
-          if (fcb.cr > MaxCR) {
-            fcb.cr = 1;
-            fcb.ex++;
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          // Read one block
+          result = sdSeqWrite(fName, fPos);
+          // Check the result
+          if (!result) {
+            // Reset unmodified flag
+            fcb.s2 &= 0x7F;
+            // Read succeeded, adjust FCB
+            fcb.cr++;
+            if (fcb.cr > MaxCR) {
+              fcb.cr = 1;
+              fcb.ex++;
+            }
+            if (fcb.ex > MaxEX) {
+              fcb.ex = 0;
+              fcb.s2++;
+            }
+            if ((fcb.s2 & 0x7F) > MaxS2)
+              // TODO Not sure what to do
+              result = 0xfe;
           }
-          if (fcb.ex > MaxEX) {
-            fcb.ex = 0;
-            fcb.s2++;
-          }
-          if ((fcb.s2 & 0x7F) > MaxS2)
-            // TODO Not sure what to do
-            result = 0xfe;
         }
-        // TODO Return error 4 if write protected
-        // bdosError(4);
+        else
+          // Return error 4 if write protected
+          bdosError(4);
       }
       // Write the FCB back into RAM
-      ram->write(ramFCB, fcb.buf, 36);
+      writeFCB();
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -387,33 +383,34 @@ void BDOS::call(uint16_t port) {
     case 0x16:  // FCREATE
       // Create a file function.
       result = 0xFF;
-      // Get the FCB address
-      ramFCB = cpu->regDE();
-      // Create the FCB object
-      ram->read(ramFCB, fcb.buf, 36);
+      // Read the FCB from RAM, address in DE
+      readFCB();
       // Select the drive
       if (sdSelect(fcb.dr)) {
-        // TODO Check if the drive is R/O
-        // Get the filename on SD card
-        fcb2fname(fcb, fName);
-        // Create the file
-        if (sdCreate(fName)) {
-          // Initializes the FCB
-          fcb.ex = 0x00;
-          fcb.s1 = 0x00;
-          fcb.s2 = 0x00;
-          fcb.rc = 0x00;
-          // Clean allocation
-          for (uint8_t i = 0; i < 16; i++)
-            fcb.al[i] = 0x00;
-          fcb.cr = 0x00;
-          result = 0x00;
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          // Create the file
+          if (sdCreate(fName)) {
+            // Initializes the FCB
+            fcb.ex = 0x00;
+            fcb.s1 = 0x00;
+            fcb.s2 = 0x00;
+            fcb.rc = 0x00;
+            // Clean allocation
+            for (uint8_t i = 0; i < 16; i++)
+              fcb.al[i] = 0x00;
+            fcb.cr = 0x00;
+            result = 0x00;
+          }
         }
-        // TODO Return error 4 if write protected
-        // bdosError(4);
+        else
+          // Return error 4 if write protected
+          bdosError(4);
       }
       // Write the FCB back into RAM
-      ram->write(ramFCB, fcb.buf, 36);
+      writeFCB();
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -421,32 +418,33 @@ void BDOS::call(uint16_t port) {
     case 0x17:  // RENFILE
       // Function to rename a file.
       result = 0xFF;
-      // Get the FCB address
-      ramFCB = cpu->regDE();
-      // Create the FCB object
-      ram->read(ramFCB, fcb.buf, 36);
+      // Read the FCB from RAM, address in DE
+      readFCB();
       // Select the drive
       if (sdSelect(fcb.dr)) {
-        // TODO Check if the drive is R/O
-        uint16_t ramNewFCB = ramFCB + 16;
-        // Prevents rename from moving files among drives
-        ram->writeByte(ramNewFCB, ram->readByte(ramFCB));
-        // Create the new FCB object
-        FCB_t newfcb;
-        ram->read(ramNewFCB, newfcb.buf, 36);
-        // Get the filename on SD card
-        fcb2fname(fcb, fName);
-        // Get the new filename on SD card
-        char newName[128];
-        fcb2fname(newfcb, newName);
-        // Rename the file
-        if (sdRename(fName, newName))
-          result = 0x00;
-        // TODO Return error 4 if write protected
-        // bdosError(4);
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          uint16_t ramNewFCB = ramFCB + 16;
+          // Prevents rename from moving files among drives
+          ram->writeByte(ramNewFCB, ram->readByte(ramFCB));
+          // Create the new FCB object
+          FCB_t newfcb;
+          ram->read(ramNewFCB, newfcb.buf, 36);
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          // Get the new filename on SD card
+          char newName[128];
+          fcb2fname(newfcb, newName);
+          // Rename the file
+          if (sdRename(fName, newName))
+            result = 0x00;
+        }
+        else
+          // Return error 4 if write protected
+          bdosError(4);
       }
       // Write the FCB back into RAM
-      ram->write(ramFCB, fcb.buf, 36);
+      writeFCB();
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -468,7 +466,10 @@ void BDOS::call(uint16_t port) {
       bios->setdma();
       break;
 
-
+    case 0x1B:  // GETALOC
+      // Function to return the allocation vector.
+      cpu->regHL(alcVector);
+      break;
 
     case 0x1C:  // WRTPRTD
       // Function to write protect the current disk.
@@ -500,6 +501,165 @@ void BDOS::call(uint16_t port) {
         cUser = cpu->regE() & 0x0F;
       break;
 
+    case 0x21:  // RDRANDOM
+      // Function to read a random record from a file.
+      result = 0xFF;
+      // Read the FCB from RAM, address in DE
+      readFCB();
+      // Compute the file record and seek position
+      fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
+      fPos = fRec * BlkSZ;
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        // Read one block
+        result = sdSeqRead(fName, fPos);
+        // Check the result
+        if (result == 0 or result == 1 or result == 4) {
+          // Adjust FCB unless error #6 (seek past 8MB)
+          fcb.cr = fRec & 0x7F;
+          fcb.ex = (fRec >> 7) & 0x1f;
+          fcb.s2 = ((fRec >> 12) & MaxS2) | (fcb.s2 & 0x80);
+        }
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+    case 0x22:  // WTRANDOM
+      // Function to write a random record to a file.
+      result = 0xFF;
+      // Read the FCB from RAM, address in DE
+      readFCB();
+      // Compute the file record and seek position
+      fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
+      fPos = fRec * BlkSZ;
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          // Write one block
+          result = sdSeqWrite(fName, fPos);
+          // Check the result
+          if (!result) {
+            // Reset unmodified flag
+            fcb.s2 &= 0x7F;
+            // Read succeeded, adjust FCB
+            fcb.cr = fRec & 0x7F;
+            fcb.ex = (fRec >> 7) & 0x1f;
+            fcb.s2 = (fRec >> 12) & MaxS2;  // resets unmodified flag
+          }
+        }
+        else
+          // Return error 4 if write protected
+          bdosError(4);
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+    case 0x23:  // FILESIZE
+      // Function to compute the size of a random file.
+      result = 0xFF;
+      // Read the FCB from RAM
+      readFCB();
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // TODO Find the file
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        //Serial.println(fName);
+        // Get the file size (in blocks)
+        fSize = sdFileSize(fName) / BlkSZ;
+        if (fSize != -1) {
+          fcb.r0 = count & 0xFF;
+          fcb.r1 = (count >>  8) & 0xFF;
+          fcb.r2 = (count >> 16) & 0xFF;
+          // Success
+          result = 0x00;
+        }
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+    case 0x24:  // SETRAN
+      // Function to return the random record position of a given
+      // file which has been read in sequential mode up to now.
+      result = 0x00;
+      // Read the FCB from RAM
+      readFCB();
+      // Get the last used record
+      fSize  = fcb.cr & 0x7F;
+      fSize += (fcb.ex & 0x1F) << 7;
+      fSize += (fcb.s2 & MaxS2) << 12;
+      // Compute random position and store it into fcb
+      fcb.r0 = fSize & 0xFF;
+      fcb.r1 = (fSize >>  8) & 0xFF;
+      fcb.r2 = (fSize >> 16) & 0xFF;
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+    case 0x25:  // LOGOFF
+      // This allows a program to log off any drives.
+      break;
+
+    case 0x26:  // DRVACCESS
+      // Locks one or more disc drives.
+      break;
+
+    case 0x27:  // DRVFREE
+      // Releases locks on disc drives.
+      break;
+
+    case 0x28:  // WTSPECL
+      // For the case where we are writing to unused disk space, this
+      // space will be zeroed out first.
+      result = 0xFF;
+      // Read the FCB from RAM, address in DE
+      readFCB();
+      // Compute the file record and seek position
+      fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
+      fPos = fRec * BlkSZ;
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          // Write one block
+          result = sdSeqWrite(fName, fPos);
+          // Check the result
+          if (!result) {
+            // Reset unmodified flag
+            fcb.s2 &= 0x7F;
+            // Read succeeded, adjust FCB
+            fcb.cr = fRec & 0x7F;
+            fcb.ex = (fRec >> 7) & 0x1f;
+            fcb.s2 = (fRec >> 12) & MaxS2;  // resets unmodified flag
+          }
+        }
+        else
+          // Return error 4 if write protected
+          bdosError(4);
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
 
     default:
       /*
@@ -593,6 +753,23 @@ bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   return unique;
 }
 
+// Read the FCB from RAM, register DE has the address.
+// Store the address in ramFCB and the FCB in fcb
+void BDOS::readFCB() {
+  // Get the FCB address
+  ramFCB = cpu->regDE();
+  // Create the FCB object
+  ram->read(ramFCB, fcb.buf, 36);
+}
+
+// Write the FCB back into RAM.
+// The address is already in ramFCB and the FCB in fcb
+void BDOS::writeFCB() {
+  // Write the FCB back into RAM
+  ram->write(ramFCB, fcb.buf, 36);
+}
+
+
 bool BDOS::sdSelect(uint8_t drive) {
   bool result = false;
   char disk[] = "A";
@@ -641,9 +818,23 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
       else
         // Read error
         result = 0x01;
-    } else
+    } else {
       // Seek error
-      result = 0x01;
+      if (fpos >= 0x010000UL * BlkSZ)
+        // Seek past 8MB (largest file size in CP/M)
+        result = 0x06;
+      else {
+        uint32_t exSize = file.size();
+        // Round file size up to next full logical extent
+        exSize = ExtSZ * ((exSize / ExtSZ) + ((exSize % ExtSZ) ? 1 : 0));
+        if (fpos < exSize)
+          // Reading unwritten data
+          result = 0x01;
+        else
+          // Seek to unwritten extent
+          result = 0x04;
+      }
+    }
     // Close the file
     file.close();
   } else
@@ -672,10 +863,10 @@ uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
         result = 0x00;
       else
         // Write error
-        result = 0x01;
+        result = 0x02;
     } else
       // Seek error
-      result = 0x01;
+      result = 0x06;
     // Close the file
     file.close();
   } else

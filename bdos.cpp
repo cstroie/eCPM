@@ -20,9 +20,7 @@
 #include "bdos.h"
 #include <SD.h>
 
-BDOS::BDOS(I8080 cpu, RAM ram) {
-  this->cpu = cpu;
-  this->ram = ram;
+BDOS::BDOS(I8080 *cpu, RAM *ram, BIOS *bios): cpu(cpu), ram(ram), bios(bios) {
 }
 
 BDOS::~BDOS() {
@@ -31,20 +29,20 @@ BDOS::~BDOS() {
 void BDOS::init() {
   // Serial number, 6 bytes
   uint8_t cpmSerialNo[] = {0, 22, 0, 0, 0, 0};
-  ram.write(BDOSCODE, cpmSerialNo, 6);
+  ram->write(BDOSCODE, cpmSerialNo, 6);
 
   // BDOS entry (FBASE)
-  ram.writeByte(BDOSCODE + 6, 0xC3);          // JP
-  ram.writeWord(BDOSCODE + 7, BDOSCODE + 0x0100);
+  ram->writeByte(BDOSCODE + 6, 0xC3);          // JP
+  ram->writeWord(BDOSCODE + 7, BDOSCODE + 0x0100);
 
   // BDOS dispatcher (FBASE1)
-  ram.writeByte(BDOSCODE + 0x0100,     0xDB); // IN A
-  ram.writeByte(BDOSCODE + 0x0100 + 1, 0x00);
-  ram.writeByte(BDOSCODE + 0x0100 + 2, 0xC9); // RET
+  ram->writeByte(BDOSCODE + 0x0100,     0xDB); // IN A
+  ram->writeByte(BDOSCODE + 0x0100 + 1, 0x00);
+  ram->writeByte(BDOSCODE + 0x0100 + 2, 0xC9); // RET
 
 #ifdef DEBUG
-  ram.hexdump(BDOSCODE, 16);
-  ram.hexdump(BDOSCODE + 0x0100, 16);
+  ram->hexdump(BDOSCODE, 16);
+  ram->hexdump(BDOSCODE + 0x0100, 16);
 #endif
 }
 
@@ -77,7 +75,7 @@ void BDOS::bdosError(uint8_t err) {
   // Wait for a keypress
   while (!Serial.available()) { }
   // Always reboot on these errors.
-  cpu.jump(WBOOT);
+  cpu->jump(WBOOT);
 }
 
 
@@ -87,77 +85,77 @@ void BDOS::call(uint16_t port) {
   char      c;
 
   // HL is reset by the BDOS
-  cpu.regHL(0x0000);
+  cpu->regHL(0x0000);
 
-  switch (cpu.regC()) {
+  switch (cpu->regC()) {
     case 0x00:  // WBOOT
       // System reset
-      cpu.jump(WBOOT);
+      cpu->jump(WBOOT);
       break;
 
     case 0x01:  // GETCON
       // Function to get a character from the console device.
-      //cpu.jump(CONIN);
+      //cpu->jump(CONIN);
       while (!Serial.available()) { }
       c = Serial.read();
-      cpu.regHL(c);
+      cpu->regHL(c);
       if (c == 0x0A or c == 0x0D or c == 0x09 or c == 0x08 or c >= ' ')
-        cpu.regE(c);
+        cpu->regE(c);
       else
         // A regular control char so don't echo
         break;
 
     case 0x02:  // OUTCON
       // Function to output (E) to the console device and expand tabs if necessary.
-      //cpu.jump(CONOUT);
-      Serial.write((char)(cpu.regE() & 0x7F));
+      //cpu->jump(CONOUT);
+      Serial.write((char)(cpu->regE() & 0x7F));
       break;
 
     case 0x03:  // GETRDR
       // Function to get a character from the tape reader device.
-      //cpu.jump(READER);
-      cpu.regHL(0x1A);
+      //cpu->jump(READER);
+      cpu->regHL(0x1A);
       break;
 
     case 0x04:  // PUNCH
       // Auxiliary (Punch) output
-      cpu.jump(PUNCH);
+      cpu->jump(PUNCH);
       break;
 
     case 0x05:  // LIST
       // Printer output
-      cpu.jump(LIST);
+      cpu->jump(LIST);
       break;
 
     case 0x06:  // DIRCIO
       // Function to perform direct console i/o. If (C) contains (FF)
       // then this is an input request. Otherwise we are to output (C).
-      if (cpu.regE() == 0xFF)
-        cpu.regHL(Serial.available() ? Serial.read() : 0x00);
+      if (cpu->regE() == 0xFF)
+        cpu->regHL(Serial.available() ? Serial.read() : 0x00);
       else
-        Serial.write((char)(cpu.regE() & 0x7F));
+        Serial.write((char)(cpu->regE() & 0x7F));
       break;
 
     case 0x07:  // GETIOB
       // Function to return the i/o byte.
-      cpu.regHL(ram.readByte(IOBYTE));
+      cpu->regHL(ram->readByte(IOBYTE));
       break;
 
     case 0x08:  // SETIOB
       // Function to set the i/o byte.
-      ram.writeByte(IOBYTE, cpu.regE());
+      ram->writeByte(IOBYTE, cpu->regE());
       break;
 
     case 0x09:  // PRTSTR
       // Function to print the character string pointed to by (DE)
       // on the console device. The string ends with a '$'.
-      w = cpu.regDE();
-      b = ram.readByte(w++);
+      w = cpu->regDE();
+      b = ram->readByte(w++);
       while (b != '$') {
         Serial.print((char)(b & 0x7F));
-        b = ram.readByte(w++);
+        b = ram->readByte(w++);
       }
-      cpu.regDE(w);
+      cpu->regDE(w);
       break;
 
     case 0x0A:  // RDBUFF
@@ -167,8 +165,8 @@ void BDOS::call(uint16_t port) {
       // Return: A = Number of chars read
       // (DE) = First char
       // Get the number of characters to read
-      w = cpu.regDE();
-      b = ram.readByte(w);
+      w = cpu->regDE();
+      b = ram->readByte(w);
       w++;
       count = 0;
       // Very simple line input
@@ -198,13 +196,13 @@ void BDOS::call(uint16_t port) {
           // ^R
           Serial.write("#\r\n  ");
           for (uint8_t j = 1; j <= count; ++j)
-            Serial.write((char)ram.readByte(w + j));
+            Serial.write((char)ram->readByte(w + j));
         }
         else if (c == 21) {
           // ^U
           Serial.write("#\r\n  ");
-          w = cpu.regDE();
-          b = ram.readByte(w);
+          w = cpu->regDE();
+          b = ram->readByte(w);
           w++;
           count = 0;
         }
@@ -212,8 +210,8 @@ void BDOS::call(uint16_t port) {
           // ^X
           for (uint8_t j = 0; j < count; ++j)
             Serial.write("\b \b");
-          w = cpu.regDE();
-          b = ram.readByte(w);
+          w = cpu->regDE();
+          b = ram->readByte(w);
           w++;
           count = 0;
         }
@@ -222,26 +220,26 @@ void BDOS::call(uint16_t port) {
           continue;
         Serial.write((char)(c & 0x7F));
         ++count;
-        ram.writeByte(w + count, c);
+        ram->writeByte(w + count, c);
         // Reached the expected count
         if (count == b)
           break;
       }
       // Save the number of characters read
-      ram.writeByte(w, count);
+      ram->writeByte(w, count);
       // Gives a visual feedback that read ended
       Serial.write('\r');
       break;
 
     case 0x0B:  // GETCSTS
       // Function to interigate the console device.
-      cpu.regHL(Serial.available() ? 0xFF : 0x00);
+      cpu->regHL(Serial.available() ? 0xFF : 0x00);
       break;
 
     case 0x0C:  // GETVER
       // Function to return the current cp/m version number.
       // Return: B=H=system type, A=L=version number
-      cpu.regHL(0x0022);
+      cpu->regHL(0x0022);
       break;
 
     case 0x0D:  // RSTDSK
@@ -251,12 +249,12 @@ void BDOS::call(uint16_t port) {
       logVector = 0x0001;   // Reset log in vector
       ramDMA = TBUFF;      // Setup default DMA address
       //HL = _CheckSUB(); // TODO Checks if there's a $$$.SUB on the boot disk
-      cpu.regHL(0x0000);
+      cpu->regHL(0x0000);
       break;
 
     case 0x0E:  // SETDSK
       // Function to set the active disk number.
-      tDrive = cpu.regE() & 0x0F;
+      tDrive = cpu->regE() & 0x0F;
       if (cDrive != tDrive) {
         if (sdSelect(tDrive)) {
           cDrive = tDrive;
@@ -269,9 +267,9 @@ void BDOS::call(uint16_t port) {
       // Function to open a specified file.
       result = 0xFF;
       // Get the FCB address
-      ramFCB = cpu.regDE();
+      ramFCB = cpu->regDE();
       // Create the FCB object
-      ram.read(ramFCB, fcb.buf, 36);
+      ram->read(ramFCB, fcb.buf, 36);
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
@@ -294,7 +292,7 @@ void BDOS::call(uint16_t port) {
         result = 0x00;
       }
       // Return the result in HL
-      cpu.regHL(result);
+      cpu->regHL(result);
       break;
 
 
@@ -303,9 +301,9 @@ void BDOS::call(uint16_t port) {
       // Function to execute a sequential read of the specified record number.
       result = 0xFF;
       // Get the FCB address
-      ramFCB = cpu.regDE();
+      ramFCB = cpu->regDE();
       // Create the FCB object
-      ram.read(ramFCB, fcb.buf, 36);
+      ram->read(ramFCB, fcb.buf, 36);
       // Compute the file seek position
       fPos = ((fcb.s2 & MaxS2) * BlkS2 * BlkSZ) +
              (fcb.ex * BlkEX * BlkSZ) +
@@ -334,18 +332,18 @@ void BDOS::call(uint16_t port) {
         }
       }
       // Write the FCB back into RAM
-      ram.write(ramFCB, fcb.buf, 36);
+      ram->write(ramFCB, fcb.buf, 36);
       // Return the result in HL
-      cpu.regHL(result);
+      cpu->regHL(result);
       break;
 
     case 0x15:  // WRTSEQ
       // Function to write the net sequential record.
       result = 0xFF;
       // Get the FCB address
-      ramFCB = cpu.regDE();
+      ramFCB = cpu->regDE();
       // Create the FCB object
-      ram.read(ramFCB, fcb.buf, 36);
+      ram->read(ramFCB, fcb.buf, 36);
       // Compute the file seek position
       fPos = ((fcb.s2 & MaxS2) * BlkS2 * BlkSZ) +
              (fcb.ex * BlkEX * BlkSZ) +
@@ -379,18 +377,18 @@ void BDOS::call(uint16_t port) {
         // bdosError(4);
       }
       // Write the FCB back into RAM
-      ram.write(ramFCB, fcb.buf, 36);
+      ram->write(ramFCB, fcb.buf, 36);
       // Return the result in HL
-      cpu.regHL(result);
+      cpu->regHL(result);
       break;
 
     case 0x16:  // FCREATE
       // Create a file function.
       result = 0xFF;
       // Get the FCB address
-      ramFCB = cpu.regDE();
+      ramFCB = cpu->regDE();
       // Create the FCB object
-      ram.read(ramFCB, fcb.buf, 36);
+      ram->read(ramFCB, fcb.buf, 36);
       // Select the drive
       if (sdSelect(fcb.dr)) {
         // TODO Check if the drive is R/O
@@ -413,27 +411,27 @@ void BDOS::call(uint16_t port) {
         // bdosError(4);
       }
       // Write the FCB back into RAM
-      ram.write(ramFCB, fcb.buf, 36);
+      ram->write(ramFCB, fcb.buf, 36);
       // Return the result in HL
-      cpu.regHL(result);
+      cpu->regHL(result);
       break;
 
     case 0x17:  // RENFILE
       // Function to rename a file.
       result = 0xFF;
       // Get the FCB address
-      ramFCB = cpu.regDE();
+      ramFCB = cpu->regDE();
       // Create the FCB object
-      ram.read(ramFCB, fcb.buf, 36);
+      ram->read(ramFCB, fcb.buf, 36);
       // Select the drive
       if (sdSelect(fcb.dr)) {
         // TODO Check if the drive is R/O
         uint16_t ramNewFCB = ramFCB + 16;
         // Prevents rename from moving files among drives
-        ram.writeByte(ramNewFCB, ram.readByte(ramFCB));
+        ram->writeByte(ramNewFCB, ram->readByte(ramFCB));
         // Create the new FCB object
         FCB_t newfcb;
-        ram.read(ramNewFCB, newfcb.buf, 36);
+        ram->read(ramNewFCB, newfcb.buf, 36);
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Get the new filename on SD card
@@ -446,26 +444,26 @@ void BDOS::call(uint16_t port) {
         // bdosError(4);
       }
       // Write the FCB back into RAM
-      ram.write(ramFCB, fcb.buf, 36);
+      ram->write(ramFCB, fcb.buf, 36);
       // Return the result in HL
-      cpu.regHL(result);
+      cpu->regHL(result);
       break;
 
     case 0x18:  // GETLOG
       // Function to return the login vector.
-      cpu.regHL(logVector);
+      cpu->regHL(logVector);
       break;
 
     case 0x19:  // GETCRNT
       // Function to return the current disk assignment.
-      cpu.regHL(0x00);
+      cpu->regHL(0x00);
       break;
 
     case 0x1A:  // PUTDMA
       // Function to set the dma address.
-      ramDMA = cpu.regDE();
-      cpu.regBC(ramDMA);
-      cpu.jump(SETDMA);
+      ramDMA = cpu->regDE();
+      cpu->regBC(ramDMA);
+      cpu->jump(SETDMA);
       break;
 
 
@@ -477,7 +475,7 @@ void BDOS::call(uint16_t port) {
 
     case 0x1D:  // GETROV
       // Function to return the read-only status vector.
-      cpu.regHL(rwoVector);
+      cpu->regHL(rwoVector);
       break;
 
     case 0x1E:  // SETATTR
@@ -486,18 +484,18 @@ void BDOS::call(uint16_t port) {
 
     case 0x1F:  // GETPARM
       // Function to return the address of the disk parameter block for the current drive.
-      cpu.regHL(DPBADDR);
+      cpu->regHL(DPBADDR);
       break;
 
     case 0x20:  // GETUSER
       // Function to get or set the user number. If (E) was (FF)
       // then this is a request to return the current user number.
       // Else set the user number from (E).
-      if (cpu.regE() == 0xFF)
-        cpu.regHL(cUser & 0x000F);
+      if (cpu->regE() == 0xFF)
+        cpu->regHL(cUser & 0x000F);
       else
         // TODO Make user dir
-        cUser = cpu.regE() & 0x0F;
+        cUser = cpu->regE() & 0x0F;
       break;
 
 
@@ -508,18 +506,18 @@ void BDOS::call(uint16_t port) {
 #ifdef DEBUG
       // Show unimplemented BDOS calls only when debugging
       Serial.print("\r\nUnimplemented BDOS call 0x");
-      Serial.print(cpu.regC(), 16);
+      Serial.print(cpu->regC(), 16);
       Serial.print("\r\n");
-      cpu.trace();
+      cpu->trace();
 #endif
       break;
   }
 
   // CP/M BDOS does this before returning
-  cpu.regB((uint8_t)cpu.regH());
-  cpu.regA((uint8_t)cpu.regL());
+  cpu->regB((uint8_t)cpu->regH());
+  cpu->regA((uint8_t)cpu->regL());
   // C ends up equal to E
-  cpu.regC((uint8_t)cpu.regE());
+  cpu->regC((uint8_t)cpu->regE());
 }
 
 
@@ -635,7 +633,7 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
       // Read from file
       if (file.read(&buf[0], BlkSZ)) {
         // Write into RAM
-        ram.write(ramDMA, buf, BlkSZ);
+        ram->write(ramDMA, buf, BlkSZ);
         result = 0x00;
       }
       else
@@ -666,7 +664,7 @@ uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
     // Seek
     if (file.seek(fpos)) {
       // Read from RAM
-      ram.read(ramDMA, buf, BlkSZ);
+      ram->read(ramDMA, buf, BlkSZ);
       // Write to file
       if (file.write(&buf[0], BlkSZ))
         result = 0x00;

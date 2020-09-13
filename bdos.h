@@ -30,6 +30,7 @@
 #include "config.h"
 #include "i8080.h"
 #include "ram.h"
+#include "bios.h"
 
 struct FCB_t  {
   union {
@@ -69,7 +70,7 @@ struct DIR_t {
 
 class BDOS {
   public:
-    BDOS(I8080 cpu, RAM ram);
+    BDOS(I8080 *cpu, RAM *ram, BIOS *bios);
     ~BDOS();
     void init();
     void call(uint16_t port);
@@ -77,8 +78,10 @@ class BDOS {
     uint8_t selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);
   private:
-    I8080 cpu;
-    RAM   ram;
+    I8080 *cpu;
+    RAM   *ram;
+    BIOS  *bios;
+    
     void      bdosError(uint8_t err);
 
     bool      sdSelect(uint8_t drive);

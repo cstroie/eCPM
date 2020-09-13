@@ -46,7 +46,7 @@ struct DPB_t {
 
 class BIOS {
   public:
-    BIOS(I8080 cpu, RAM ram);
+    BIOS(I8080 *cpu, RAM *ram);
     ~BIOS();
     void init();
     void call(uint16_t code);
@@ -73,8 +73,8 @@ class BIOS {
     void  signon();
     void  gocpm();
     void  loadCCP();
-    I8080 cpu;
-    RAM   ram;
+    I8080 *cpu;
+    RAM   *ram;
 
 };
 

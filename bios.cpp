@@ -20,9 +20,7 @@
 #include "bios.h"
 #include "ccp.h"
 
-BIOS::BIOS(I8080 cpu, RAM ram) {
-  this->cpu = cpu;
-  this->ram = ram;
+BIOS::BIOS(I8080 *cpu, RAM *ram): cpu(cpu), ram(ram) {
 }
 
 BIOS::~BIOS() {
@@ -34,34 +32,34 @@ void BIOS::init() {
   for (uint8_t i = 0; i < 17; i++) {
     offset = i * 3;
     // BIOS jump vectors
-    ram.writeByte(BIOSCODE + offset, 0xC3);               // JP
-    ram.writeWord(BIOSCODE + offset + 1, BIOSCODE + 0x0100 + offset);
+    ram->writeByte(BIOSCODE + offset, 0xC3);               // JP
+    ram->writeWord(BIOSCODE + offset + 1, BIOSCODE + 0x0100 + offset);
     // BIOS routines
-    ram.writeByte(BIOSCODE + 0x0100 + offset,     0xD3);  // OUT A
-    ram.writeByte(BIOSCODE + 0x0100 + offset + 1, i);
-    ram.writeByte(BIOSCODE + 0x0100 + offset + 2, 0xC9);  // RET
+    ram->writeByte(BIOSCODE + 0x0100 + offset,     0xD3);  // OUT A
+    ram->writeByte(BIOSCODE + 0x0100 + offset + 1, i);
+    ram->writeByte(BIOSCODE + 0x0100 + offset + 2, 0xC9);  // RET
   }
 
   // Define the DPB
   //uint8_t bufDPB[15];
   //DPB* dpb = (DPB*)bufDPB;
-  //ram.write(DPBADDR, bufDPB, 15);
+  //ram->write(DPBADDR, bufDPB, 15);
 
   // DPB_t dpb = {.spt = 0x0040, .bsh = 0x05, .blm = 0x1F, .exm = 0x01, .dsm = 0x07FF, .drm = 0x03FF, .al0 = 0xFF, .al1 = 0x00, .cks = 0x0000, .off = 0x0002};
   DPB_t dpb = {0x0040, 0x05, 0x1F, 0x01, 0x07FF, 0x03FF, 0xFF, 0x00, 0x0000, 0x0002};
-  ram.write(DPBADDR, dpb.buf, 16);
+  ram->write(DPBADDR, dpb.buf, 16);
 
 
   // Patch in a JP to WBOOT at location 0x0000
-  //ram.writeByte(0x0000, JP);
-  //ram.writeWord(0x0001, WBOOT);
+  //ram->writeByte(0x0000, JP);
+  //ram->writeWord(0x0001, WBOOT);
 
   // Load CCP
   loadCCP();
 
 #ifdef DEBUG
-  ram.hexdump(BIOSCODE, offset);
-  ram.hexdump(BIOSCODE + 0x0100, offset);
+  ram->hexdump(BIOSCODE, offset);
+  ram->hexdump(BIOSCODE + 0x0100, offset);
 #endif
 }
 
@@ -71,19 +69,19 @@ void BIOS::signon() {
 
 void BIOS::gocpm() {
   // Patch in a JP to WBOOT at location 0x0000
-  ram.writeByte(0x0000, 0xC3);  // JP
-  ram.writeWord(0x0001, WBOOT);
+  ram->writeByte(0x0000, 0xC3);  // JP
+  ram->writeWord(0x0001, WBOOT);
   //  Patch in a JP to the BDOS entry at location 0x0005
-  ram.writeByte(ENTRY, 0xC3);   // JP
-  ram.writeWord(ENTRY + 1, BDOSCODE + 0x06);
+  ram->writeByte(ENTRY, 0xC3);   // JP
+  ram->writeWord(ENTRY + 1, BDOSCODE + 0x06);
   // Last loged disk number
-  cpu.regC(ram.readByte(TDRIVE));
+  cpu->regC(ram->readByte(TDRIVE));
   // Jump to CCP
-  cpu.jump(CCPCODE);
+  cpu->jump(CCPCODE);
 }
 
 void BIOS::loadCCP() {
-  ram.write(CCPCODE, CCP_BIN, CCP_BIN_len);
+  ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
 }
 
 void BIOS::call(uint16_t code) {
@@ -179,7 +177,7 @@ void BIOS::call(uint16_t code) {
       Serial.print("\r\nUnimplemented BIOS call: 0x");
       Serial.print(code, 16);
       Serial.print("\r\n");
-      cpu.trace();
+      cpu->trace();
 #endif
       break;
   }
@@ -190,8 +188,8 @@ void BIOS::call(uint16_t code) {
 void BIOS::boot() {
   signon();
   // Clear IOBYTE and TDRIVE
-  ram.writeByte(IOBYTE, 0x00);  // 0x3D
-  ram.writeByte(TDRIVE, 0x00);
+  ram->writeByte(IOBYTE, 0x00);  // 0x3D
+  ram->writeByte(TDRIVE, 0x00);
   // Go to CP/M
   gocpm();
 }
@@ -206,18 +204,18 @@ void BIOS::wboot() {
 
 // Console status to register A
 void BIOS::consts() {
-  cpu.regA(Serial.available() ? 0xff : 0x00);
+  cpu->regA(Serial.available() ? 0xff : 0x00);
 }
 
 // Console character input to register A
 void BIOS::conin() {
   while (!Serial.available()) { }
-  cpu.regA(Serial.read());
+  cpu->regA(Serial.read());
 }
 
 // Console device output character in C
 void BIOS::conout() {
-  Serial.write((char)(cpu.regC() & 0x7F));
+  Serial.write((char)(cpu->regC() & 0x7F));
 }
 
 // List device output character in C
@@ -230,7 +228,7 @@ void BIOS::punch() {
 
 // Reader character input to A (0x1A = device not implemented)
 void BIOS::reader() {
-  cpu.regA(0x1A);
+  cpu->regA(0x1A);
 }
 
 // Move disk to home position
@@ -239,7 +237,7 @@ void BIOS::home() {
 
 // Select disk given by register C
 void BIOS::seldsk() {
-  cpu.regHL(0x0000);
+  cpu->regHL(0x0000);
 }
 
 // Set track address given by C
@@ -252,26 +250,26 @@ void BIOS::setsec() {
 
 // Set dma address given by register BC
 void BIOS::setdma() {
-  cpu.regHL(cpu.regBC());
-  //dmaAddr = cpu.regBC();
+  cpu->regHL(cpu->regBC());
+  //dmaAddr = cpu->regBC();
 }
 
 // Read next disk record (disk/trk/sec/dma set)
 void BIOS::read() {
-  cpu.regA(0x00);
+  cpu->regA(0x00);
 }
 
 // Write next disk record (disk/trk/sec/dma set)
 void BIOS::write() {
-  cpu.regA(0x00);
+  cpu->regA(0x00);
 }
 
 // Return list device status in A
 void BIOS::listst() {
-  cpu.regA(0xFF);
+  cpu->regA(0xFF);
 }
 
 // Translate sector BC using table at DE
 void BIOS::sectran() {
-  cpu.regHL(cpu.regBC());  // HL=BC=No translation (1:1)
+  cpu->regHL(cpu->regBC());  // HL=BC=No translation (1:1)
 }

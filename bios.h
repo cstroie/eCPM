@@ -49,10 +49,28 @@ class BIOS {
     BIOS(I8080 cpu, RAM ram);
     ~BIOS();
     void init();
-    void signon();
     void call(uint16_t code);
 
+    void boot();
+    void wboot();
+    void consts();
+    void conin();
+    void conout();
+    void list();
+    void punch();
+    void reader();
+    void home();
+    void seldsk();
+    void settrk();
+    void setsec();
+    void setdma();
+    void read();
+    void write();
+    void listst();
+    void sectran();
+
   private:
+    void  signon();
     void  gocpm();
     void  loadCCP();
     I8080 cpu;

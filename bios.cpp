@@ -90,92 +90,87 @@ void BIOS::call(uint16_t code) {
   switch (code) {
     case 0x00:  // BOOT
       // Print signon message and go to CCP
-      signon();
-      // Clear IOBYTE and TDRIVE
-      ram.writeByte(IOBYTE, 0x00);  // 0x3D
-      ram.writeByte(TDRIVE, 0x00);
-      // Go to CP/M
-      gocpm();
+      boot();
       break;
 
     case 0x01:  // WBOOT
       // Back to CCP
-      // TODO print warm boot message
-      loadCCP();
-      // Go to CP/M
-      gocpm();
+      wboot();
       break;
 
     case 0x02:  // CONST
       // Console status to register A
-      cpu.regA(Serial.available() ? 0xff : 0x00);
+      consts();
       break;
 
     case 0x03:  // CONIN
       // Console character input to register A
-      while (!Serial.available()) { }
-      cpu.regA(Serial.read());
+      conin();
       break;
 
     case 0x04:  // CONOUT
       // Console device output character in C
-      Serial.write((char)(cpu.regC() & 0x7F));
+      conout();
       break;
 
     case 0x05:  // LIST
       // List device output character in C
+      list();
       break;
 
     case 0x06:  // PUNCH
       // Punch device output character in C
+      punch();
       break;
 
     case 0x07:  // READER
       // Reader character input to A (0x1A = device not implemented)
-      cpu.regA(0x1A);
+      reader();
       break;
 
     case 0x08:  // HOME
       // Move disk to home position
+      home();
       break;
 
     case 0x09:  // SELDSK
       // Select disk given by register C
-      cpu.regHL(0x0000);
+      seldsk();
       break;
 
     case 0x0A:  // SETTRK
       // Set track address given by C
+      settrk();
       break;
 
     case 0x0B:  // SETSEC
       // Set sector number given by C
+      setsec();
       break;
 
     case 0x0C:  // SETDMA
       // Set dma address given by register BC
-      cpu.regHL(cpu.regBC());
-      //dmaAddr = cpu.regBC();
+      setdma();
       break;
 
     case 0x0D:  // READ
       // Read next disk record (disk/trk/sec/dma set)
-      cpu.regA(0x00);
+      read();
       break;
 
     case 0x0E:  // WRITE
       // Write next disk record (disk/trk/sec/dma set)
-      cpu.regA(0x00);
+      write();
       break;
 
     case 0x0F:  // LISTST
       // Return list device status in A
-      cpu.regA(0xFF);
+      listst();
       break;
 
     case 0x10:  // SECTRAN
       // Translate sector BC using table at DE
-      cpu.regHL(cpu.regBC());  // HL=BC=No translation (1:1)
+      sectran();
       break;
 
     default:
@@ -188,4 +183,95 @@ void BIOS::call(uint16_t code) {
 #endif
       break;
   }
+}
+
+
+// Print signon message and go to CCP
+void BIOS::boot() {
+  signon();
+  // Clear IOBYTE and TDRIVE
+  ram.writeByte(IOBYTE, 0x00);  // 0x3D
+  ram.writeByte(TDRIVE, 0x00);
+  // Go to CP/M
+  gocpm();
+}
+
+// Back to CCP
+void BIOS::wboot() {
+  // TODO print warm boot message
+  loadCCP();
+  // Go to CP/M
+  gocpm();
+}
+
+// Console status to register A
+void BIOS::consts() {
+  cpu.regA(Serial.available() ? 0xff : 0x00);
+}
+
+// Console character input to register A
+void BIOS::conin() {
+  while (!Serial.available()) { }
+  cpu.regA(Serial.read());
+}
+
+// Console device output character in C
+void BIOS::conout() {
+  Serial.write((char)(cpu.regC() & 0x7F));
+}
+
+// List device output character in C
+void BIOS::list() {
+}
+
+// Punch device output character in C
+void BIOS::punch() {
+}
+
+// Reader character input to A (0x1A = device not implemented)
+void BIOS::reader() {
+  cpu.regA(0x1A);
+}
+
+// Move disk to home position
+void BIOS::home() {
+}
+
+// Select disk given by register C
+void BIOS::seldsk() {
+  cpu.regHL(0x0000);
+}
+
+// Set track address given by C
+void BIOS::settrk() {
+}
+
+// Set sector number given by C
+void BIOS::setsec() {
+}
+
+// Set dma address given by register BC
+void BIOS::setdma() {
+  cpu.regHL(cpu.regBC());
+  //dmaAddr = cpu.regBC();
+}
+
+// Read next disk record (disk/trk/sec/dma set)
+void BIOS::read() {
+  cpu.regA(0x00);
+}
+
+// Write next disk record (disk/trk/sec/dma set)
+void BIOS::write() {
+  cpu.regA(0x00);
+}
+
+// Return list device status in A
+void BIOS::listst() {
+  cpu.regA(0xFF);
+}
+
+// Translate sector BC using table at DE
+void BIOS::sectran() {
+  cpu.regHL(cpu.regBC());  // HL=BC=No translation (1:1)
 }

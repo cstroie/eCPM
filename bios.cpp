@@ -49,11 +49,6 @@ void BIOS::init() {
   DPB_t dpb = {0x0040, 0x05, 0x1F, 0x01, 0x07FF, 0x03FF, 0xFF, 0x00, 0x0000, 0x0002};
   ram->write(DPBADDR, dpb.buf, 16);
 
-
-  // Patch in a JP to WBOOT at location 0x0000
-  //ram->writeByte(0x0000, JP);
-  //ram->writeWord(0x0001, WBOOT);
-
   // Load CCP
   loadCCP();
 
@@ -63,26 +58,6 @@ void BIOS::init() {
 #endif
 }
 
-void BIOS::signon() {
-  Serial.print("\r\n64K CP/M v2.2 (eCPM 0.1)\r\n");
-}
-
-void BIOS::gocpm() {
-  // Patch in a JP to WBOOT at location 0x0000
-  ram->writeByte(0x0000, 0xC3);  // JP
-  ram->writeWord(0x0001, WBOOT);
-  //  Patch in a JP to the BDOS entry at location 0x0005
-  ram->writeByte(ENTRY, 0xC3);   // JP
-  ram->writeWord(ENTRY + 1, BDOSCODE + 0x06);
-  // Last loged disk number
-  cpu->regC(ram->readByte(TDRIVE));
-  // Jump to CCP
-  cpu->jump(CCPCODE);
-}
-
-void BIOS::loadCCP() {
-  ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
-}
 
 void BIOS::call(uint16_t code) {
   switch (code) {
@@ -204,7 +179,7 @@ void BIOS::wboot() {
 
 // Console status to register A
 void BIOS::consts() {
-  cpu->regA(Serial.available() ? 0xff : 0x00);
+  cpu->regA(Serial.available() ? 0xFF : 0x00);
 }
 
 // Console character input to register A
@@ -272,4 +247,26 @@ void BIOS::listst() {
 // Translate sector BC using table at DE
 void BIOS::sectran() {
   cpu->regHL(cpu->regBC());  // HL=BC=No translation (1:1)
+}
+
+
+void BIOS::signon() {
+  Serial.print("\r\n64K CP/M v2.2 (eCPM 0.1)\r\n");
+}
+
+void BIOS::gocpm() {
+  // Patch in a JP to WBOOT at location 0x0000
+  ram->writeByte(0x0000, 0xC3);  // JP
+  ram->writeWord(0x0001, WBOOT);
+  //  Patch in a JP to the BDOS entry at location 0x0005
+  ram->writeByte(ENTRY, 0xC3);   // JP
+  ram->writeWord(ENTRY + 1, BDOSCODE + 0x06);
+  // Last loged disk number
+  cpu->regC(ram->readByte(TDRIVE));
+  // Jump to CCP
+  cpu->jump(CCPCODE);
+}
+
+void BIOS::loadCCP() {
+  ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
 }

@@ -94,8 +94,8 @@ class BDOS {
 
     bool      sdSelect(uint8_t drive);
     uint32_t  sdFileSize(char* fname);
-    uint8_t   sdFindFirst(char* fname, bool isDir);
-    uint8_t   sdFindNext(bool isDir);
+    uint8_t   sdFindFirst(char* fname, bool doDir);
+    uint8_t   sdFindNext(bool doDir);
     uint8_t   sdSeqRead(char* fname, uint32_t fpos);
     uint8_t   sdSeqWrite(char* fname, uint32_t fpos);
     bool      sdOpen(char* fname);
@@ -119,6 +119,7 @@ class BDOS {
 
     FCB_t     fcb;                // FCB object
     char      fName[128];         // Filename
+    char      fPath[16];          // Base file path
     bool      fAllUsers;          // Find files for all users
     char      fPattern[12];       // File name pattern in search
     uint32_t  fSize;              // File size

@@ -368,7 +368,37 @@ void BDOS::call(uint16_t port) {
       cpu->regHL(result);
       break;
 
-
+    case 0x13:  // DELFILE
+      // Function to delete a file by name.
+      result = 0xFF;
+      // Read the FCB from RAM, address in DE
+      readFCB();
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Check if the drive is write protected
+        if (!(rwoVector & (1 << fcb.dr))) {
+          // Get the filename on SD card
+          fcb2fname(fcb, fName);
+          result = sdFindFirst(fName, false);
+          // Now fName will contain individual matching files
+          while (result != 0xFF) {
+            // Delete it
+            sdDelete(fName);
+            // Find the next one
+            result = sdFindNext(false);
+          }
+          // Success
+          result = 0x00;
+        }
+        else
+          // Return error 4 if write protected
+          bdosError(4);
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
 
     case 0x14:  // READSEQ
       // Function to execute a sequential read of the specified record number.
@@ -735,13 +765,10 @@ void BDOS::call(uint16_t port) {
       break;
 
     default:
-      /*
-        Unimplemented calls get listed
-      */
 #ifdef DEBUG
       // Show unimplemented BDOS calls only when debugging
       Serial.print("\r\nUnimplemented BDOS call 0x");
-      Serial.print(cpu->regC(), 16);
+      Serial.print(cpu->regC(), HEX);
       Serial.print("\r\n");
       cpu->trace();
 #endif
@@ -1044,10 +1071,8 @@ uint32_t BDOS::sdFileSize(char* fname) {
   return len;
 }
 
-
-
-uint8_t BDOS::sdFindFirst(char* fname, bool isDir) {
-  char path[] = {fname[0], '/', fname[2], 0};
+uint8_t BDOS::sdFindFirst(char* fname, bool doDir) {
+  char path[] = {fname[0], '/', fname[2], '/', 0};
   // Close the previously opened SD directory, if any
   if (fDir)
     fDir.close();
@@ -1055,6 +1080,8 @@ uint8_t BDOS::sdFindFirst(char* fname, bool isDir) {
   fDir = SD.open(path);
   // Convert the host file name to CP/M file pattern
   fname2cname(fname, fPattern);
+  // Keep the path in fPath
+  strcpy(fPath, path);
 
   /*
     fileRecords = 0;
@@ -1062,10 +1089,10 @@ uint8_t BDOS::sdFindFirst(char* fname, bool isDir) {
     fileExtentsUsed = 0;
   */
 
-  return sdFindNext(isDir);
+  return sdFindNext(doDir);
 }
 
-uint8_t BDOS::sdFindNext(bool isDir) {
+uint8_t BDOS::sdFindNext(bool doDir) {
   uint8_t result = 0xFF;
   ledOn();
   // Find the next file, skipping over directories
@@ -1083,8 +1110,12 @@ uint8_t BDOS::sdFindNext(bool isDir) {
     uint8_t uid = fname2cname((char*)fname, cname);
     // Match the pattern
     if (match(cname, fPattern)) {
-      // Create a directory entry
-      dirEntry(cname, uid, fsize);
+      if (doDir)
+        // Create a directory entry
+        dirEntry(cname, uid, fsize);
+      // Return the full file name in fName
+      strncpy(fName, fPath, 16);
+      strncat(fName, (char*)fname, 128);
       // Success
       result = 0x00;
       break;
@@ -1099,7 +1130,7 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
   uint8_t buf[BlkSZ];
   ledOn();
   // Open the file
-  file = SD.open((char*)fname, FILE_READ);
+  file = SD.open(fname, FILE_READ);
   // Check if the file has been open
   if (file) {
     // Seek
@@ -1146,9 +1177,9 @@ uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
   uint8_t buf[BlkSZ];
   ledOn();
   // Check if we need to extend the file
-  if (sdExtend((char*)fname, fpos))
+  if (sdExtend(fname, fpos))
     // Open the file
-    file = SD.open((char*)fname, FILE_WRITE);
+    file = SD.open(fname, FILE_WRITE);
   // Check if the file has been open
   if (file) {
     // Seek
@@ -1176,7 +1207,7 @@ uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
 bool BDOS::sdCreate(char* fname) {
   bool result = false;
   ledOn();
-  file = SD.open((char*)fname, FILE_WRITE);
+  file = SD.open(fname, FILE_WRITE);
   if (file) {
     file.close();
     result = true;
@@ -1187,7 +1218,7 @@ bool BDOS::sdCreate(char* fname) {
 
 bool BDOS::sdDelete(char* fname) {
   ledOn();
-  SD.remove((char*)fname);
+  SD.remove(fname);
   ledOff();
   return true;
 }
@@ -1195,7 +1226,7 @@ bool BDOS::sdDelete(char* fname) {
 bool BDOS::sdRename(char* fname, char* newname) {
   bool result = false;
   ledOn();
-  file = SD.open((char*)fname, FILE_WRITE);
+  file = SD.open(fname, FILE_WRITE);
   if (file) {
     // FIXME
     //if (file.rename((char*)newname)) {

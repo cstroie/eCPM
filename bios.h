@@ -72,6 +72,8 @@ class BIOS {
     uint8_t listst();
     void    sectran();
 
+    DPB_t   dpb;
+
   private:
     void    signon();
     void    gocpm();

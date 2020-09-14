@@ -152,7 +152,7 @@ void BIOS::call(uint16_t code) {
 #ifdef DEBUG
       // Show unimplemented BIOS calls only when debugging
       Serial.print("\r\nUnimplemented BIOS call: 0x");
-      Serial.print(code, 16);
+      Serial.print(code, HEX);
       Serial.print("\r\n");
       cpu->trace();
 #endif
@@ -174,6 +174,8 @@ void BIOS::boot() {
 // Back to CCP
 void BIOS::wboot() {
   // TODO print warm boot message
+  Serial.print("\r\n64K CP/M v2.2\r\n");
+  // Reload CCP
   loadCCP();
   // Go to CP/M
   gocpm();

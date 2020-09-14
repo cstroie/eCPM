@@ -77,17 +77,24 @@ class BDOS {
 
     uint8_t selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);
+    void    fname2fcb(FCB_t fcb, char* fname);
+    void    fname2de(DIR_t de, char* fname);
+    uint8_t fname2cname(char *fname, char *cname, bool zStr = true);
+    
   private:
-    I8080 *cpu;
-    RAM   *ram;
-    BIOS  *bios;
+    I8080     *cpu;
+    RAM       *ram;
+    BIOS      *bios;
 
     void      bdosError(uint8_t err);
     void      readFCB();
     void      writeFCB();
+    void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
     bool      sdSelect(uint8_t drive);
     uint32_t  sdFileSize(char* fname);
+    uint8_t   sdFindFirst(char* fname, bool isDir);
+    uint8_t   sdFindNext(bool isDir);
     uint8_t   sdSeqRead(char* fname, uint32_t fpos);
     uint8_t   sdSeqWrite(char* fname, uint32_t fpos);
     bool      sdCreate(char* fname);
@@ -109,10 +116,13 @@ class BDOS {
 
     FCB_t     fcb;                // FCB object
     char      fName[128];         // Filename
+    bool      fAllUsers;          // Find files for all users
+    char      fPattern[12];       // File name pattern in search
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
     uint32_t  fRec;               // File record (random seek)
     File      file;
+    File      fDir;               // The directory to look into
 
     uint16_t  result;             // Result from BDOS functions
 };

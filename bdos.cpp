@@ -295,6 +295,42 @@ void BDOS::call(uint16_t port) {
       break;
 
 
+    case 0x11:  // GETFST
+      // Function to return the first occurence of a specified file name.
+      result = 0xFF;
+      // Read the FCB from RAM, address in DE
+      readFCB();
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Get the filename on SD card
+        fcb2fname(fcb, fName);
+        fAllUsers = fcb.dr == '?';
+        if (fAllUsers)
+          result = sdFindFirst(fName, true);
+        else
+          result = sdFindFirst(fName, true);
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+    case 0x12:  // GETNXT
+      // Function to return the next occurence of a file name.
+      result = 0xFF;
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        if (fAllUsers)
+          result = sdFindNext(true);
+        else
+          result = sdFindNext(true);
+      }
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
+
+
 
     case 0x14:  // READSEQ
       // Function to execute a sequential read of the specified record number.
@@ -701,6 +737,7 @@ uint8_t BDOS::selDrive(uint8_t drive) {
   return (result);
 }
 
+// Convert FCB to host file name
 bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   bool unique = true;
   // Start with the drive letter
@@ -753,6 +790,79 @@ bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   return unique;
 }
 
+// Convert host file name to FCB
+void BDOS::fname2fcb(FCB_t fcb, char* fname) {
+  fname2cname(fname, (char*)fcb.fn, false);
+}
+
+// Convert host file name to directory entry
+void BDOS::fname2de(DIR_t de, char* fname) {
+  fname2cname(fname, (char*)de.fn, false);
+}
+
+// Convert a string name (AB.TXT) to CP/M name (AB      TXT)
+uint8_t BDOS::fname2cname(char *fname, char *cname, bool zStr) {
+  uint8_t i = 0;
+  uint8_t uid = 0;
+  // Skip over the drive code, user code and '/' if needed
+  if (fname[1] == '/') {
+    // Keep the user id
+    uid = (uint8_t)fname[2] - '0';
+    // Advance to file name
+    fname += 4;
+  }
+  // Convert file name to uppercase and copy to CP/M name
+  i = 0;
+  while (*fname != 0 && *fname != '.') {
+    *cname = toupper(*fname);
+    fname++;
+    cname++;
+    i++;
+  }
+  // Fill the remainder chars in CP/M name with spaces
+  for (; i < 8; i++) {
+    *cname = ' ';
+    cname++;
+  }
+  // Skip over the dot
+  if (*fname == '.')
+    fname++;
+  // Convert extension to uppercase and copy to CP/M type
+  i = 0;
+  while (*fname != 0) {
+    *cname = toupper(*fname);
+    fname++;
+    cname++;
+    i++;
+  }
+  // Fill the remainder chars in CP/M type with spaces
+  for (; i < 3; i++) {
+    *cname = ' ';
+    cname++;
+  }
+  // End with zero if string
+  if (zStr)
+    *cname = 0;
+  // Return the user id
+  return uid;
+}
+
+// Matches a FCB name to a search pattern
+bool match(char *cname, char* pattern) {
+  bool result = true;
+  for (uint8_t i = 0; i < 12; i++)
+    if (*pattern == '?' || *pattern == *cname) {
+      cname++;
+      pattern++;
+      continue;
+    } else {
+      result = false;
+      break;
+    }
+  return result;
+}
+
+
 // Read the FCB from RAM, register DE has the address.
 // Store the address in ramFCB and the FCB in fcb
 void BDOS::readFCB() {
@@ -769,6 +879,72 @@ void BDOS::writeFCB() {
   ram->write(ramFCB, fcb.buf, 36);
 }
 
+// Create a directory entry into RAM
+void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
+  uint8_t blocks, i;
+  // Create the directory entry object
+  DIR_t de;
+  // Zero it out
+  memset(de.buf, 0, 32);
+  // Store the user id
+  if (fAllUsers)
+    // FIXME use the proper user id currFindUser; // set user code for return
+    de.uu = uid;
+  else
+    de.uu = uid;
+  // Copy the file name and type from cname
+  memcpy(de.fn, cname, 12);
+
+  // Round the file size to the next multiple of blocks
+  if (fsize & (BlkSZ - 1))
+    fsize = fsize | (BlkSZ - 1);
+  // File records
+  uint32_t recs = fsize / BlkSZ;
+  // File extents
+  uint16_t exts = recs / BlkEX + ((recs & (BlkEX - 1)) ? 1 : 0);
+  // File extents used (start with zero)
+  // FIXME global?
+  uint16_t extu = 0;
+
+  uint8_t firstFreeAllocBlock = 25;
+
+  // Check if the file fits in a single directory entry
+  if (exts <= bios->dpb.exm + 1) {
+    // Yes, compute the data
+    if (exts > 0) {
+      de.ex = (exts - 1 + extu) % (MaxEX + 1);
+      de.s2 = (exts - 1 + extu) / (MaxEX + 1);
+      de.rc = recs - (BlkEX * (exts - 1));
+    }
+    blocks = (recs >> bios->dpb.bsh) + ((recs & bios->dpb.blm) ? 1 : 0);
+    recs = 0;
+    exts = 0;
+    extu = 0;
+  }
+  else {
+    // No, max out the directory entry
+    de.ex = (bios->dpb.exm + extu) % (MaxEX + 1);
+    de.s2 = (bios->dpb.exm + extu) / (MaxEX + 1);
+    de.rc = BlkEX;
+    blocks = (bios->dpb.dsm + 1) < 256 ? 16 : 8;
+    // Update remaining records and extents for next call
+    recs -= (bios->dpb.exm + 1) * BlkEX;
+    exts -= (bios->dpb.exm + 1);
+    extu += (bios->dpb.exm + 1);
+  }
+  // Phoney up an appropriate number of allocation blocks
+  if (bios->dpb.dsm <= 255)
+    for (i = 0; i < blocks; i++)
+      de.al[i] = (uint8_t)firstFreeAllocBlock++;
+  else
+    for (i = 0; i < 2 * blocks; i += 2) {
+      de.al[i] = firstFreeAllocBlock & 0xFF;
+      de.al[i + 1] = firstFreeAllocBlock >> 8;
+      firstFreeAllocBlock++;
+    }
+  // Write the directory entry into RAM (at the DMA address)
+  ram->write(ramDMA, de.buf, 32);
+}
 
 bool BDOS::sdSelect(uint8_t drive) {
   bool result = false;
@@ -795,6 +971,56 @@ uint32_t BDOS::sdFileSize(char* fname) {
   }
   ledOff();
   return len;
+}
+
+
+
+uint8_t BDOS::sdFindFirst(char* fname, bool isDir) {
+  char path[] = {fname[0], '/', fname[2], 0};
+  // Close the previously opened SD directory, if any
+  if (fDir)
+    fDir.close();
+  // Open the SD directory (aka drive in CP/M)
+  fDir = SD.open(path);
+  // Convert the host file name to CP/M file pattern
+  fname2cname(fname, fPattern);
+
+  /*
+    fileRecords = 0;
+    fileExtents = 0;
+    fileExtentsUsed = 0;
+  */
+
+  return sdFindNext(isDir);
+}
+
+uint8_t BDOS::sdFindNext(bool isDir) {
+  uint8_t result = 0xFF;
+  ledOn();
+  // Find the next file, skipping over directories
+  while (file = fDir.openNextFile()) {
+    // Get the file name and size
+    const char *fname = file.name();
+    unsigned long fsize = file.size();
+    // Close it
+    file.close();
+    // Skip over host directories
+    if (file.isDirectory())
+      continue;
+    // Convert the file name to CP/M name and get user id
+    char cname[12];
+    uint8_t uid = fname2cname((char*)fname, cname);
+    // Match the pattern
+    if (match(cname, fPattern)) {
+      // Create a directory entry
+      dirEntry(cname, uid, fsize);
+      // Success
+      result = 0x00;
+      break;
+    }
+  }
+  ledOff();
+  return result;
 }
 
 uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {

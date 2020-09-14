@@ -80,7 +80,7 @@ class BDOS {
     void    fname2fcb(FCB_t fcb, char* fname);
     void    fname2de(DIR_t de, char* fname);
     uint8_t fname2cname(char *fname, char *cname, bool zStr = true);
-    
+
   private:
     I8080     *cpu;
     RAM       *ram;
@@ -89,6 +89,7 @@ class BDOS {
     void      bdosError(uint8_t err);
     void      readFCB();
     void      writeFCB();
+    void      showFCB();
     void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
     bool      sdSelect(uint8_t drive);
@@ -97,10 +98,12 @@ class BDOS {
     uint8_t   sdFindNext(bool isDir);
     uint8_t   sdSeqRead(char* fname, uint32_t fpos);
     uint8_t   sdSeqWrite(char* fname, uint32_t fpos);
+    bool      sdOpen(char* fname);
     bool      sdCreate(char* fname);
     bool      sdDelete(char* fname);
     bool      sdRename(char* fname, char* newname);
     bool      sdExtend(char* fname, uint32_t fpos);
+    bool      sdTruncate(char* fname, uint8_t rc);
 
     void      ledOn();
     void      ledOff();

@@ -60,6 +60,8 @@ void BIOS::init() {
 
 
 void BIOS::call(uint16_t code) {
+  //cpu->trace();
+
   switch (code) {
     case 0x00:  // BOOT
       // Print signon message and go to CCP

@@ -28,6 +28,9 @@
 #define BIOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380)
 #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00)
 #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
+// Position of the $$$.SUB FCB on this CCP
+#define BatchFCB    (CCPCODE + 0x07AC)   
+
 
 #define DPBADDR     (BIOSDATA + 0x40)
 
@@ -62,7 +65,7 @@
 
 /* CP/M disk definitions */
 #define BlkSZ 128  // CP/M block size
-#define BlkEX 128 // Number of blocks on an extension
+#define BlkEX 128  // Number of blocks in extent
 #define ExtSZ (BlkSZ * BlkEX)
 #define BlkS2 4096  // Number of blocks on a S2 (module)
 #define MaxEX 31  // Maximum value the EX field can take

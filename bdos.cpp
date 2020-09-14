@@ -86,11 +86,12 @@ void BDOS::call(uint16_t port) {
 
   // HL is reset by the BDOS
   cpu->regHL(0x0000);
+  //cpu->trace();
 
   switch (cpu->regC()) {
     case 0x00:  // WBOOT
       // System reset
-      bios->wboot();;
+      bios->wboot();
       break;
 
     case 0x01:  // GETCON
@@ -273,27 +274,64 @@ void BDOS::call(uint16_t port) {
       fcb.s2 = 0x00;
       // Select the drive
       if (sdSelect(fcb.dr)) {
-        // TODO Find the file
         // Get the filename on SD card
         fcb2fname(fcb, fName);
-        //Serial.println(fName);
-        // Get the file size (in blocks)
-        fSize = sdFileSize(fName) / BlkSZ;
-        // Reset S1 and S2
-        fcb.s1 = 0x00;
-        fcb.s2 = 0x80; // set unmodified flag
-        // Set the record count
-        fcb.rc = fSize > MaxRC ? MaxRC : (uint8_t)fSize;
-        // Clean up allocation
-        for (uint8_t i = 0; i < 16; i++)
-          fcb.al[i] = 0x00;
-        // Success
-        result = 0x00;
+        // Try to open it
+        if (sdOpen(fName)) {
+          // Get the file size (in blocks)
+          fSize = sdFileSize(fName) / BlkSZ;
+          // Reset S1 and S2
+          fcb.s1 = 0x00;
+          fcb.s2 = 0x80; // set unmodified flag
+          // Set the record count
+          fcb.rc = fSize > MaxRC ? MaxRC : (uint8_t)fSize;
+          // Clean up allocation
+          for (uint8_t i = 0; i < 16; i++)
+            fcb.al[i] = 0x00;
+          // Success
+          result = 0x00;
+        }
       }
+      // Write the FCB back into RAM
+      writeFCB();
       // Return the result in HL
       cpu->regHL(result);
       break;
 
+    case 0x10:  // CLOSEFIL
+      // Function to close a specified file.
+      result = 0xFF;
+      // Read the FCB from RAM
+      readFCB();
+      // Clear S2
+      fcb.s2 = 0x00;
+      // Select the drive
+      if (sdSelect(fcb.dr)) {
+        // Check if the file has been modifed
+        if (!(fcb.s2 & 0x80)) {
+          // Check if the drive is write protected
+          if (!(rwoVector & (1 << fcb.dr))) {
+            // Get the filename on SD card
+            fcb2fname(fcb, fName);
+            // Check if this is '$$$.SUB'
+            if (ramFCB == BatchFCB)
+              // Truncate it to fcb.rc CP/M records so SUBMIT.COM can work
+              sdTruncate(fName, fcb.rc);
+            result = 0x00;
+          }
+          else
+            // Return error 4 if write protected
+            bdosError(4);
+        }
+        else
+          // Success
+          result = 0x00;
+      }
+      // Write the FCB back into RAM
+      writeFCB();
+      // Return the result in HL
+      cpu->regHL(result);
+      break;
 
     case 0x11:  // GETFST
       // Function to return the first occurence of a specified file name.
@@ -492,7 +530,7 @@ void BDOS::call(uint16_t port) {
 
     case 0x19:  // GETCRNT
       // Function to return the current disk assignment.
-      cpu->regHL(0x00);
+      cpu->regHL(cDrive);
       break;
 
     case 0x1A:  // PUTDMA
@@ -611,7 +649,6 @@ void BDOS::call(uint16_t port) {
         // TODO Find the file
         // Get the filename on SD card
         fcb2fname(fcb, fName);
-        //Serial.println(fName);
         // Get the file size (in blocks)
         fSize = sdFileSize(fName) / BlkSZ;
         if (fSize != -1) {
@@ -870,6 +907,8 @@ void BDOS::readFCB() {
   ramFCB = cpu->regDE();
   // Create the FCB object
   ram->read(ramFCB, fcb.buf, 36);
+  // Show FCB
+  //showFCB();
 }
 
 // Write the FCB back into RAM.
@@ -877,6 +916,26 @@ void BDOS::readFCB() {
 void BDOS::writeFCB() {
   // Write the FCB back into RAM
   ram->write(ramFCB, fcb.buf, 36);
+}
+
+// Debug FCB
+void BDOS::showFCB() {
+  char buf[80];
+  Serial.print("\r\nDR FN       TP   EX S1 S2 RC CR R0 R1 R2");
+  Serial.print("\r\n ");
+  Serial.print((char)(fcb.dr + 'A'));
+  Serial.print(' ');
+  for (uint8_t i = 0; i < 8; i++) Serial.print((char)fcb.fn[i]);
+  Serial.print(' ');
+  for (uint8_t i = 0; i < 3; i++) Serial.print((char)fcb.tp[i]);
+  sprintf_P(buf, PSTR("  %02X %02X %02X %02X %02X %02X %02X %02X "),
+            fcb.ex, fcb.s1, fcb.s2, fcb.rc, fcb.cr, fcb.r0, fcb.r1, fcb.r2);
+  Serial.print(buf);
+  //for (uint8_t i = 0; i < 16; i++) {
+  //  sprintf_P(buf, PSTR(" %02X"), fcb.al[i]);
+  //  Serial.print(buf);
+  //}
+  Serial.print("\r\n");
 }
 
 // Create a directory entry into RAM
@@ -961,11 +1020,23 @@ bool BDOS::sdSelect(uint8_t drive) {
   return result;
 }
 
+bool BDOS::sdOpen(char* fname) {
+  bool result = false;
+  // Open the file
+  ledOn();
+  if (file = SD.open(fname, FILE_READ)) {
+    file.close();
+    result = true;
+  }
+  ledOff();
+  return result;
+}
+
 uint32_t BDOS::sdFileSize(char* fname) {
   uint32_t len = -1;
   // Open the file and get the size
-  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
-  if (file = SD.open((char*)fname, FILE_READ)) {
+  ledOn();
+  if (file = SD.open(fname, FILE_READ)) {
     len = file.size();
     file.close();
   }
@@ -1153,6 +1224,18 @@ bool BDOS::sdExtend(char* fname, uint32_t fpos) {
     file.close();
   } else
     result = false;
+  ledOff();
+  return result;
+}
+
+bool BDOS::sdTruncate(char* fname, uint8_t rc) {
+  bool result = false;
+  ledOn();
+  if (file = SD.open(fname, FILE_WRITE))
+    if (file.truncate(rc * BlkSZ)) {
+      file.close();
+      result = true;
+    }
   ledOff();
   return result;
 }

@@ -74,9 +74,9 @@ void I8080::iff(int on) {
 
 
 I8080 cpu;
-
+DRIVE drv(&ram);
 BIOS bios(&cpu, &ram);
-BDOS bdos(&cpu, &ram, &bios);
+BDOS bdos(&cpu, &ram, &drv, &bios);
 
 
 void callBIOS(int port, int value) {

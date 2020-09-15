@@ -74,4 +74,15 @@
 #define MaxCR 128 // Maximum value the CR field can take
 #define MaxRC 128 // Maximum value the RC field can take
 
+// File name combined char string
+#define FNDRIVE   0
+#define FNUSER    1
+#define FNFILE    2
+#define FNTYPE    10
+#define FNZERO    13
+#define FNHOST    16
+
+#define toHEX(x)    ((x) < 10 ? (x) + 48 : (x) + 87)
+#define frHEX(x)    (((x) >= '0' && (x) <= '9') ? ((x) - '0') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : 0)))
+
 #endif /* GLOBAL_H */

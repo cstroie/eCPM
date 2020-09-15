@@ -20,7 +20,7 @@
 #include "bdos.h"
 #include <SD.h>
 
-BDOS::BDOS(I8080 *cpu, RAM *ram, BIOS *bios): cpu(cpu), ram(ram), bios(bios) {
+BDOS::BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios): cpu(cpu), ram(ram), drv(drv), bios(bios) {
 }
 
 BDOS::~BDOS() {
@@ -44,13 +44,6 @@ void BDOS::init() {
   ram->hexdump(BDOSCODE, 16);
   ram->hexdump(BDOSCODE + 0x0100, 16);
 #endif
-}
-
-void BDOS::ledOn() {
-  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
-}
-void BDOS::ledOff() {
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
 }
 
 void BDOS::bdosError(uint8_t err) {
@@ -249,20 +242,19 @@ void BDOS::call(uint16_t port) {
       cDrive = 0;           // Select drive 'A'
       rwoVector = 0x0000;   // Clear write protect vector
       logVector = 0x0001;   // Reset log in vector
-      ramDMA = TBUFF;      // Setup default DMA address
-      //HL = _CheckSUB(); // TODO Checks if there's a $$$.SUB on the boot disk
+      ramDMA = TBUFF;       // Setup default DMA address
+      //HL = _CheckSUB();   // TODO Check if there's a $$$.SUB on the boot disk
       cpu->regHL(0x0000);
       break;
 
     case 0x0E:  // SETDSK
       // Function to set the active disk number.
       tDrive = cpu->regE() & 0x0F;
-      if (cDrive != tDrive) {
-        if (sdSelect(tDrive)) {
+      if (cDrive != tDrive)
+        if (drv->selDrive(tDrive)) {
           cDrive = tDrive;
           logVector = logVector | (1 << cDrive);
         }
-      }
       break;
 
     case 0x0F:  // OPENFIL
@@ -273,13 +265,13 @@ void BDOS::call(uint16_t port) {
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Try to open it
-        if (sdOpen(fName)) {
+        if (drv->open(fName)) {
           // Get the file size (in blocks)
-          fSize = sdFileSize(fName) / BlkSZ;
+          fSize = drv->fileSize(fName) / BlkSZ;
           // Reset S1 and S2
           fcb.s1 = 0x00;
           fcb.s2 = 0x80; // set unmodified flag
@@ -306,7 +298,7 @@ void BDOS::call(uint16_t port) {
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the file has been modifed
         if (!(fcb.s2 & 0x80)) {
           // Check if the drive is write protected
@@ -316,7 +308,7 @@ void BDOS::call(uint16_t port) {
             // Check if this is '$$$.SUB'
             if (ramFCB == BatchFCB)
               // Truncate it to fcb.rc CP/M records so SUBMIT.COM can work
-              sdTruncate(fName, fcb.rc);
+              drv->truncate(fName, fcb.rc);
             result = 0x00;
           }
           else
@@ -339,15 +331,29 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (sdSelect(fcb.dr)) {
-        // Get the filename on SD card
-        fcb2fname(fcb, fName);
+      if (drv->selDrive(fcb.dr)) {
+        // Keep the drive letter, user hexcode and CP/M filename
+        // (pattern, actually) in fName: 'A0???????????'
+        fName[FNDRIVE] = fcb.dr + 'A';
+        fName[FNUSER] = toHEX(cUser);
+        memcpy(fName + FNFILE, fcb.fn, 11);
+        fName[FNZERO] = '\0';
+        // Check if we need to find for all users
         fAllUsers = fcb.dr == '?';
         if (fAllUsers)
-          result = sdFindFirst(fName, true);
+          result = drv->findFirst(fName, fSize);
         else
-          result = sdFindFirst(fName, true);
+          result = drv->findFirst(fName, fSize);
+        if (result == 0x00)
+          // On return, fName contains the drive letter,
+          // hex user code and the CP/M name.
+          // Create a directory entry
+          dirEntry(fName + FNFILE, frHEX(fName[1]), fSize);
       }
+      // Reset direntry file size counters
+      fRecs = 0;
+      fExts = 0;
+      fExtU = 0;
       // Write the FCB back into RAM
       writeFCB();
       // Return the result in HL
@@ -358,11 +364,16 @@ void BDOS::call(uint16_t port) {
       // Function to return the next occurence of a file name.
       result = 0xFF;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         if (fAllUsers)
-          result = sdFindNext(true);
+          result = drv->findNext(fName, fSize);
         else
-          result = sdFindNext(true);
+          result = drv->findNext(fName, fSize);
+        if (result == 0x00)
+          // On return, fName contains the drive letter,
+          // hex user code and CP/M name
+          // Create a directory entry
+          dirEntry(fName + FNFILE, frHEX(fName[1]), fSize);
       }
       // Return the result in HL
       cpu->regHL(result);
@@ -374,18 +385,22 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
-          // Get the filename on SD card
-          fcb2fname(fcb, fName);
-          result = sdFindFirst(fName, false);
+          // Keep the drive letter, user hexcode and CP/M filename
+          // (pattern, actually) in fName: 'A0???????????'
+          fName[FNDRIVE] = fcb.dr + 'A';
+          fName[FNUSER] = toHEX(cUser);
+          memcpy(fName + FNFILE, fcb.fn, 11);
+          fName[FNZERO] = '\0';
+          result = drv->findFirst(fName, fSize);
           // Now fName will contain individual matching files
           while (result != 0xFF) {
-            // Delete it
-            sdDelete(fName);
+            // Delete it, the full file name starts at FNHOST
+            drv->remove(fName + FNHOST);
             // Find the next one
-            result = sdFindNext(false);
+            result = drv->findNext(fName, fSize);
           }
           // Success
           result = 0x00;
@@ -410,11 +425,11 @@ void BDOS::call(uint16_t port) {
              (fcb.ex * BlkEX * BlkSZ) +
              (fcb.cr * BlkSZ);
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
-        result = sdRead(fName, fPos);
+        result = drv->read(ramDMA, fName, fPos);
         // Check the result
         if (!result) {
           // Read succeeded, adjust FCB
@@ -448,13 +463,13 @@ void BDOS::call(uint16_t port) {
              (fcb.ex * BlkEX * BlkSZ) +
              (fcb.cr * BlkSZ);
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Read one block
-          result = sdWrite(fName, fPos);
+          result = drv->write(ramDMA, fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -490,13 +505,13 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Create the file
-          if (sdCreate(fName)) {
+          if (drv->create(fName)) {
             // Initializes the FCB
             fcb.ex = 0x00;
             fcb.s1 = 0x00;
@@ -525,7 +540,7 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           uint16_t ramNewFCB = ramFCB + 16;
@@ -540,7 +555,7 @@ void BDOS::call(uint16_t port) {
           char newName[128];
           fcb2fname(newfcb, newName);
           // Rename the file
-          if (sdRename(fName, newName))
+          if (drv->rename(fName, newName))
             result = 0x00;
         }
         else
@@ -614,11 +629,11 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
-        result = sdRead(fName, fPos);
+        result = drv->read(ramDMA, fName, fPos);
         // Check the result
         if (result == 0 or result == 1 or result == 4) {
           // Adjust FCB unless error #6 (seek past 8MB)
@@ -642,13 +657,13 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Write one block
-          result = sdWrite(fName, fPos);
+          result = drv->write(ramDMA, fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -675,12 +690,12 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM
       readFCB();
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // TODO Find the file
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Get the file size (in blocks)
-        fSize = sdFileSize(fName) / BlkSZ;
+        fSize = drv->fileSize(fName) / BlkSZ;
         if (fSize != -1) {
           fcb.r0 = count & 0xFF;
           fcb.r1 = (count >>  8) & 0xFF;
@@ -737,13 +752,13 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (sdSelect(fcb.dr)) {
+      if (drv->selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Write one block
-          result = sdWrite(fName, fPos);
+          result = drv->write(ramDMA, fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -836,8 +851,8 @@ void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
     de.uu = uid;
   else
     de.uu = uid;
-  // Copy the file name and type from cname
-  memcpy(de.fn, cname, 12);
+  // Copy the file name and type from cname (8+3 bytes)
+  memcpy(de.fn, cname, 11);
 
   // Round the file size to the next multiple of blocks
   if (fsize & (BlkSZ - 1))
@@ -889,7 +904,6 @@ void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
   ram->write(ramDMA, de.buf, 32);
 }
 
-
 uint8_t BDOS::selDrive(uint8_t drive) {
   uint8_t result = 0xFF;
   // Check if the drive is specified
@@ -897,7 +911,7 @@ uint8_t BDOS::selDrive(uint8_t drive) {
     // Use the current drive
     drive = cDrive;
   // Check if the drive exists (as directory on SD)
-  if (sdSelect(drive)) {
+  if (drv->selDrive(drive)) {
     // Set the drive log in vector
     logVector = logVector | (1 << drive);
     result = 0x00;
@@ -911,6 +925,7 @@ uint8_t BDOS::selDrive(uint8_t drive) {
 // Convert FCB to host file name
 bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   bool unique = true;
+  // TODO Use custom base paths
   // Start with the drive letter
   if (fcb.dr && fcb.dr != '?')
     // The drive is specified and non ambiguous
@@ -921,7 +936,7 @@ bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   // Path separator
   *(fname++) = '/';
   // User number, converted to HEX
-  *(fname++) = toupper('0' + cUser + (cUser > 9 ? 7 : 0));
+  *(fname++) = toHEX(cUser);
   // Path separator
   *(fname++) = '/';
   // Check if the file name is ambiguous or not
@@ -959,322 +974,4 @@ bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
   *(fname++) = '\0';
   // Return if it is ambiguous or not
   return unique;
-}
-
-// Convert host file name to FCB
-void BDOS::fname2fcb(FCB_t fcb, char* fname) {
-  fname2cname(fname, (char*)fcb.fn, false);
-}
-
-// Convert host file name to directory entry
-void BDOS::fname2de(DIR_t de, char* fname) {
-  fname2cname(fname, (char*)de.fn, false);
-}
-
-// Convert a string name (AB.TXT) to CP/M name (AB      TXT)
-uint8_t BDOS::fname2cname(char *fname, char *cname, bool zStr) {
-  uint8_t i = 0;
-  uint8_t uid = 0;
-  // Skip over the drive code, user code and '/' if needed
-  if (fname[1] == '/') {
-    // Keep the user id
-    uid = (uint8_t)fname[2] - '0';
-    // Advance to file name
-    fname += 4;
-  }
-  // Convert file name to uppercase and copy to CP/M name
-  i = 0;
-  while (*fname != 0 && *fname != '.') {
-    *cname = toupper(*fname);
-    fname++;
-    cname++;
-    i++;
-  }
-  // Fill the remainder chars in CP/M name with spaces
-  for (; i < 8; i++) {
-    *cname = ' ';
-    cname++;
-  }
-  // Skip over the dot
-  if (*fname == '.')
-    fname++;
-  // Convert extension to uppercase and copy to CP/M type
-  i = 0;
-  while (*fname != 0) {
-    *cname = toupper(*fname);
-    fname++;
-    cname++;
-    i++;
-  }
-  // Fill the remainder chars in CP/M type with spaces
-  for (; i < 3; i++) {
-    *cname = ' ';
-    cname++;
-  }
-  // End with zero if string
-  if (zStr)
-    *cname = 0;
-  // Return the user id
-  return uid;
-}
-
-// Matches a FCB name to a search pattern
-bool match(char *cname, char* pattern) {
-  bool result = true;
-  for (uint8_t i = 0; i < 12; i++)
-    if (*pattern == '?' || *pattern == *cname) {
-      cname++;
-      pattern++;
-      continue;
-    } else {
-      result = false;
-      break;
-    }
-  return result;
-}
-
-
-bool BDOS::sdSelect(uint8_t drive) {
-  bool result = false;
-  char disk[] = "A";
-  // Adjust the drive letter
-  disk[0] += drive;
-  // Check for directory existence
-  ledOn();
-  if (file = SD.open(disk, FILE_READ)) {
-    result = file.isDirectory();
-    file.close();
-  }
-  ledOff();
-  return result;
-}
-
-bool BDOS::sdOpen(char* fname) {
-  bool result = false;
-  // Open the file
-  ledOn();
-  if (file = SD.open(fname, FILE_READ)) {
-    file.close();
-    result = true;
-  }
-  ledOff();
-  return result;
-}
-
-uint32_t BDOS::sdFileSize(char* fname) {
-  uint32_t len = -1;
-  // Open the file and get the size
-  ledOn();
-  if (file = SD.open(fname, FILE_READ)) {
-    len = file.size();
-    file.close();
-  }
-  ledOff();
-  return len;
-}
-
-uint8_t BDOS::sdFindFirst(char* fname, bool doDir) {
-  char path[] = {fname[0], '/', fname[2], '/', 0};
-  // Close the previously opened SD directory, if any
-  if (fDir)
-    fDir.close();
-  // Open the SD directory (aka drive in CP/M)
-  fDir = SD.open(path);
-  // Convert the host file name to CP/M file pattern
-  fname2cname(fname, fPattern);
-  // Keep the path in fPath
-  strcpy(fPath, path);
-  // Reset direntry file size counters
-  fRecs = 0;
-  fExts = 0;
-  fExtU = 0;
-  // Go find it
-  return sdFindNext(doDir);
-}
-
-uint8_t BDOS::sdFindNext(bool doDir) {
-  uint8_t result = 0xFF;
-  ledOn();
-  // Find the next file, skipping over directories
-  while (file = fDir.openNextFile()) {
-    // Get the file name and size
-    const char *fname = file.name();
-    unsigned long fsize = file.size();
-    // Close it
-    file.close();
-    // Skip over host directories
-    if (file.isDirectory())
-      continue;
-    // Convert the file name to CP/M name and get user id
-    char cname[12];
-    uint8_t uid = fname2cname((char*)fname, cname);
-    // Match the pattern
-    if (match(cname, fPattern)) {
-      if (doDir)
-        // Create a directory entry
-        dirEntry(cname, uid, fsize);
-      // Return the full file name in fName
-      strncpy(fName, fPath, 16);
-      strncat(fName, (char*)fname, 128);
-      // Success
-      result = 0x00;
-      break;
-    }
-  }
-  ledOff();
-  return result;
-}
-
-uint8_t BDOS::sdRead(char* fname, uint32_t fpos) {
-  uint8_t result = 0xFF;
-  uint8_t buf[BlkSZ];
-  ledOn();
-  // Open the file
-  if (file = SD.open(fname, FILE_READ)) {
-    // Seek
-    if (file.seek(fpos)) {
-      // Clear the buffer (^Z)
-      memset(buf, 0x1A, BlkSZ);
-      // Read from file
-      if (file.read(&buf[0], BlkSZ)) {
-        // Write into RAM
-        ram->write(ramDMA, buf, BlkSZ);
-        result = 0x00;
-      }
-      else
-        // Read error
-        result = 0x01;
-    } else {
-      // Seek error
-      if (fpos >= 0x010000UL * BlkSZ)
-        // Seek past 8MB (largest file size in CP/M)
-        result = 0x06;
-      else {
-        uint32_t exSize = file.size();
-        // Round the file size up to next full logical extent
-        exSize = ExtSZ * ((exSize / ExtSZ) + ((exSize % ExtSZ) ? 1 : 0));
-        if (fpos < exSize)
-          // Reading unwritten data
-          result = 0x01;
-        else
-          // Seek to unwritten extent
-          result = 0x04;
-      }
-    }
-    // Close the file
-    file.close();
-  } else
-    // Open error
-    result = 0x10;
-  ledOff();
-  return result;
-}
-
-uint8_t BDOS::sdWrite(char* fname, uint32_t fpos) {
-  uint8_t result = 0xFF;
-  uint8_t buf[BlkSZ];
-  ledOn();
-  // Open the file for write
-  if (file = SD.open(fname, FILE_WRITE)) {
-    // Check if we need to seek beyond end
-    if (fpos > file.size()) {
-      // Seek to end
-      file.seek(file.size());
-      // Append
-      for (uint32_t i = 0; i < fpos - file.size(); i++)
-        if (file.write((uint8_t)0) != 1) {
-          // Disk full
-          result = 0x02;
-          break;
-        }
-    }
-    // Check if the result is unchanged
-    if (result == 0xFF)
-      // Seek
-      if (file.seek(fpos)) {
-        // Read from RAM
-        ram->read(ramDMA, buf, BlkSZ);
-        // Write to file
-        if (file.write(&buf[0], BlkSZ))
-          result = 0x00;
-        else
-          // Write error
-          result = 0x02;
-      } else
-        // Seek error
-        result = 0x06;
-    // Close the file
-    file.close();
-  } else
-    // Open error
-    result = 0x10;
-  ledOff();
-  return result;
-}
-
-bool BDOS::sdCreate(char* fname) {
-  bool result = false;
-  ledOn();
-  file = SD.open(fname, FILE_WRITE);
-  if (file) {
-    file.close();
-    result = true;
-  }
-  ledOff();
-  return result;
-}
-
-bool BDOS::sdDelete(char* fname) {
-  ledOn();
-  SD.remove(fname);
-  ledOff();
-  return true;
-}
-
-bool BDOS::sdRename(char* fname, char* newname) {
-  bool result = false;
-  ledOn();
-  file = SD.open(fname, FILE_WRITE);
-  if (file) {
-    // FIXME
-    //if (file.rename(newname)) {
-    //  file.close();
-    //  result = true;
-    //}
-  }
-  ledOff();
-  return result;
-}
-
-bool BDOS::sdExtend(char* fname, uint32_t fpos) {
-  bool result = true;
-  ledOn();
-  // Open the file for write
-  if (file = SD.open(fname, FILE_WRITE)) {
-    // Check if we need to seek beyond end
-    if (fpos > file.size()) {
-      file.seek(file.size());
-      for (uint32_t i = 0; i < fpos - file.size(); i++)
-        if (file.write((uint8_t)0) != 1) {
-          result = false;
-          break;
-        }
-    }
-    file.close();
-  } else
-    result = false;
-  ledOff();
-  return result;
-}
-
-bool BDOS::sdTruncate(char* fname, uint8_t rc) {
-  bool result = false;
-  ledOn();
-  if (file = SD.open(fname, FILE_WRITE))
-    if (file.truncate(rc * BlkSZ)) {
-      file.close();
-      result = true;
-    }
-  ledOff();
-  return result;
 }

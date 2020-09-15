@@ -30,6 +30,7 @@
 #include "config.h"
 #include "i8080.h"
 #include "ram.h"
+#include "drive.h"
 #include "bios.h"
 
 struct FCB_t  {
@@ -70,20 +71,18 @@ struct DIR_t {
 
 class BDOS {
   public:
-    BDOS(I8080 *cpu, RAM *ram, BIOS *bios);
+    BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios);
     ~BDOS();
     void init();
     void call(uint16_t port);
 
     uint8_t selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);
-    void    fname2fcb(FCB_t fcb, char* fname);
-    void    fname2de(DIR_t de, char* fname);
-    uint8_t fname2cname(char *fname, char *cname, bool zStr = true);
 
   private:
     I8080     *cpu;
     RAM       *ram;
+    DRIVE     *drv;
     BIOS      *bios;
 
     void      bdosError(uint8_t err);
@@ -92,21 +91,6 @@ class BDOS {
     void      showFCB();
     void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
-    bool      sdSelect(uint8_t drive);
-    uint32_t  sdFileSize(char* fname);
-    uint8_t   sdFindFirst(char* fname, bool doDir);
-    uint8_t   sdFindNext(bool doDir);
-    uint8_t   sdRead(char* fname, uint32_t fpos);
-    uint8_t   sdWrite(char* fname, uint32_t fpos);
-    bool      sdOpen(char* fname);
-    bool      sdCreate(char* fname);
-    bool      sdDelete(char* fname);
-    bool      sdRename(char* fname, char* newname);
-    bool      sdExtend(char* fname, uint32_t fpos);
-    bool      sdTruncate(char* fname, uint8_t rc);
-
-    void      ledOn();
-    void      ledOff();
 
     uint8_t   cDrive = 0;         // Current drive
     uint8_t   tDrive = 0;         // Temporary drive
@@ -119,9 +103,8 @@ class BDOS {
 
     FCB_t     fcb;                // FCB object
     char      fName[128];         // Filename
-    char      fPath[16];          // Base file path
+    char      cName[12];          // CP/M file name
     bool      fAllUsers;          // Find files for all users
-    char      fPattern[12];       // File name pattern in search
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
     uint32_t  fRec;               // File record (random seek)
@@ -129,9 +112,6 @@ class BDOS {
     uint32_t  fRecs;              // File records in directory entry
     uint16_t  fExts;              // File extents in directory entry
     uint16_t  fExtU;              // File extents used in directory entry
-
-    File      file;
-    File      fDir;               // The directory to look into
 
     uint16_t  result;             // Result from BDOS functions
 };

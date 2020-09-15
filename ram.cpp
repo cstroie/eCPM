@@ -170,6 +170,9 @@ void RAM::hexdump(uint16_t start, uint16_t stop) {
   char buf[16];
   char val[4];
   uint8_t data;
+  // Adjust start and stop addresses
+  start &= 0xFFF0;
+  stop  |= 0x000F;
   // Start with a new line
   Serial.print("\r\n");
   // Begin SPI transfer

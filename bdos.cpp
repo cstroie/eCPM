@@ -414,7 +414,7 @@ void BDOS::call(uint16_t port) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
-        result = sdSeqRead(fName, fPos);
+        result = sdRead(fName, fPos);
         // Check the result
         if (!result) {
           // Read succeeded, adjust FCB
@@ -454,7 +454,7 @@ void BDOS::call(uint16_t port) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Read one block
-          result = sdSeqWrite(fName, fPos);
+          result = sdWrite(fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -618,7 +618,7 @@ void BDOS::call(uint16_t port) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
-        result = sdSeqRead(fName, fPos);
+        result = sdRead(fName, fPos);
         // Check the result
         if (result == 0 or result == 1 or result == 4) {
           // Adjust FCB unless error #6 (seek past 8MB)
@@ -648,7 +648,7 @@ void BDOS::call(uint16_t port) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Write one block
-          result = sdSeqWrite(fName, fPos);
+          result = sdWrite(fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -743,7 +743,7 @@ void BDOS::call(uint16_t port) {
           // Get the filename on SD card
           fcb2fname(fcb, fName);
           // Write one block
-          result = sdSeqWrite(fName, fPos);
+          result = sdWrite(fName, fPos);
           // Check the result
           if (!result) {
             // Reset unmodified flag
@@ -780,6 +780,113 @@ void BDOS::call(uint16_t port) {
   cpu->regA((uint8_t)cpu->regL());
   // C ends up equal to E
   cpu->regC((uint8_t)cpu->regE());
+}
+
+
+
+
+// Read the FCB from RAM, register DE has the address.
+// Store the address in ramFCB and the FCB in fcb
+void BDOS::readFCB() {
+  // Get the FCB address
+  ramFCB = cpu->regDE();
+  // Create the FCB object
+  ram->read(ramFCB, fcb.buf, 36);
+  // Show FCB
+  //showFCB();
+}
+
+// Write the FCB back into RAM.
+// The address is already in ramFCB and the FCB in fcb
+void BDOS::writeFCB() {
+  // Write the FCB back into RAM
+  ram->write(ramFCB, fcb.buf, 36);
+}
+
+// Debug FCB
+void BDOS::showFCB() {
+  char buf[80];
+  Serial.print("\r\nDR FN       TP   EX S1 S2 RC CR R0 R1 R2");
+  Serial.print("\r\n ");
+  Serial.print((char)(fcb.dr + 'A'));
+  Serial.print(' ');
+  for (uint8_t i = 0; i < 8; i++) Serial.print((char)fcb.fn[i]);
+  Serial.print(' ');
+  for (uint8_t i = 0; i < 3; i++) Serial.print((char)fcb.tp[i]);
+  sprintf_P(buf, PSTR("  %02X %02X %02X %02X %02X %02X %02X %02X "),
+            fcb.ex, fcb.s1, fcb.s2, fcb.rc, fcb.cr, fcb.r0, fcb.r1, fcb.r2);
+  Serial.print(buf);
+  //for (uint8_t i = 0; i < 16; i++) {
+  //  sprintf_P(buf, PSTR(" %02X"), fcb.al[i]);
+  //  Serial.print(buf);
+  //}
+  Serial.print("\r\n");
+}
+
+// Create a directory entry into RAM
+void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
+  uint8_t blocks, i;
+  // Create the directory entry object
+  DIR_t de;
+  // Zero it out
+  memset(de.buf, 0, 32);
+  // Store the user id
+  if (fAllUsers)
+    // FIXME use the proper user id currFindUser; // set user code for return
+    de.uu = uid;
+  else
+    de.uu = uid;
+  // Copy the file name and type from cname
+  memcpy(de.fn, cname, 12);
+
+  // Round the file size to the next multiple of blocks
+  if (fsize & (BlkSZ - 1))
+    fsize = fsize | (BlkSZ - 1);
+  // File records
+  fRecs = fsize / BlkSZ;
+  // File extents
+  fExts = fRecs / BlkEX + ((fRecs & (BlkEX - 1)) ? 1 : 0);
+  // File extents used (start with zero)
+  fExtU = 0;
+
+  uint8_t firstFreeAllocBlock = 25;
+
+  // Check if the file fits in a single directory entry
+  if (fExts <= bios->dpb.exm + 1) {
+    // Yes, compute the data
+    if (fExts > 0) {
+      de.ex = (fExts - 1 + fExtU) % (MaxEX + 1);
+      de.s2 = (fExts - 1 + fExtU) / (MaxEX + 1);
+      de.rc = fRecs - (BlkEX * (fExts - 1));
+    }
+    blocks = (fRecs >> bios->dpb.bsh) + ((fRecs & bios->dpb.blm) ? 1 : 0);
+    fRecs = 0;
+    fExts = 0;
+    fExtU = 0;
+  }
+  else {
+    // No, max out the directory entry
+    de.ex = (bios->dpb.exm + fExtU) % (MaxEX + 1);
+    de.s2 = (bios->dpb.exm + fExtU) / (MaxEX + 1);
+    de.rc = BlkEX;
+    blocks = (bios->dpb.dsm + 1) < 256 ? 16 : 8;
+    // Update remaining records and extents for next call
+    fRecs -= (bios->dpb.exm + 1) * BlkEX;
+    fExts -= (bios->dpb.exm + 1);
+    fExtU += (bios->dpb.exm + 1);
+  }
+  // Phoney up an appropriate number of allocation blocks
+  if (bios->dpb.dsm <= 255)
+    for (i = 0; i < blocks; i++)
+      de.al[i] = (uint8_t)firstFreeAllocBlock++;
+  else
+    for (i = 0; i < 2 * blocks; i += 2) {
+      de.al[i] = firstFreeAllocBlock & 0xFF;
+      de.al[i + 1] = firstFreeAllocBlock >> 8;
+      firstFreeAllocBlock++;
+    }
+  // Write the directory entry into RAM (at the DMA address)
+  ram->write(ramDMA, de.buf, 32);
 }
 
 
@@ -927,111 +1034,6 @@ bool match(char *cname, char* pattern) {
 }
 
 
-// Read the FCB from RAM, register DE has the address.
-// Store the address in ramFCB and the FCB in fcb
-void BDOS::readFCB() {
-  // Get the FCB address
-  ramFCB = cpu->regDE();
-  // Create the FCB object
-  ram->read(ramFCB, fcb.buf, 36);
-  // Show FCB
-  //showFCB();
-}
-
-// Write the FCB back into RAM.
-// The address is already in ramFCB and the FCB in fcb
-void BDOS::writeFCB() {
-  // Write the FCB back into RAM
-  ram->write(ramFCB, fcb.buf, 36);
-}
-
-// Debug FCB
-void BDOS::showFCB() {
-  char buf[80];
-  Serial.print("\r\nDR FN       TP   EX S1 S2 RC CR R0 R1 R2");
-  Serial.print("\r\n ");
-  Serial.print((char)(fcb.dr + 'A'));
-  Serial.print(' ');
-  for (uint8_t i = 0; i < 8; i++) Serial.print((char)fcb.fn[i]);
-  Serial.print(' ');
-  for (uint8_t i = 0; i < 3; i++) Serial.print((char)fcb.tp[i]);
-  sprintf_P(buf, PSTR("  %02X %02X %02X %02X %02X %02X %02X %02X "),
-            fcb.ex, fcb.s1, fcb.s2, fcb.rc, fcb.cr, fcb.r0, fcb.r1, fcb.r2);
-  Serial.print(buf);
-  //for (uint8_t i = 0; i < 16; i++) {
-  //  sprintf_P(buf, PSTR(" %02X"), fcb.al[i]);
-  //  Serial.print(buf);
-  //}
-  Serial.print("\r\n");
-}
-
-// Create a directory entry into RAM
-void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
-  uint8_t blocks, i;
-  // Create the directory entry object
-  DIR_t de;
-  // Zero it out
-  memset(de.buf, 0, 32);
-  // Store the user id
-  if (fAllUsers)
-    // FIXME use the proper user id currFindUser; // set user code for return
-    de.uu = uid;
-  else
-    de.uu = uid;
-  // Copy the file name and type from cname
-  memcpy(de.fn, cname, 12);
-
-  // Round the file size to the next multiple of blocks
-  if (fsize & (BlkSZ - 1))
-    fsize = fsize | (BlkSZ - 1);
-  // File records
-  uint32_t recs = fsize / BlkSZ;
-  // File extents
-  uint16_t exts = recs / BlkEX + ((recs & (BlkEX - 1)) ? 1 : 0);
-  // File extents used (start with zero)
-  // FIXME global?
-  uint16_t extu = 0;
-
-  uint8_t firstFreeAllocBlock = 25;
-
-  // Check if the file fits in a single directory entry
-  if (exts <= bios->dpb.exm + 1) {
-    // Yes, compute the data
-    if (exts > 0) {
-      de.ex = (exts - 1 + extu) % (MaxEX + 1);
-      de.s2 = (exts - 1 + extu) / (MaxEX + 1);
-      de.rc = recs - (BlkEX * (exts - 1));
-    }
-    blocks = (recs >> bios->dpb.bsh) + ((recs & bios->dpb.blm) ? 1 : 0);
-    recs = 0;
-    exts = 0;
-    extu = 0;
-  }
-  else {
-    // No, max out the directory entry
-    de.ex = (bios->dpb.exm + extu) % (MaxEX + 1);
-    de.s2 = (bios->dpb.exm + extu) / (MaxEX + 1);
-    de.rc = BlkEX;
-    blocks = (bios->dpb.dsm + 1) < 256 ? 16 : 8;
-    // Update remaining records and extents for next call
-    recs -= (bios->dpb.exm + 1) * BlkEX;
-    exts -= (bios->dpb.exm + 1);
-    extu += (bios->dpb.exm + 1);
-  }
-  // Phoney up an appropriate number of allocation blocks
-  if (bios->dpb.dsm <= 255)
-    for (i = 0; i < blocks; i++)
-      de.al[i] = (uint8_t)firstFreeAllocBlock++;
-  else
-    for (i = 0; i < 2 * blocks; i += 2) {
-      de.al[i] = firstFreeAllocBlock & 0xFF;
-      de.al[i + 1] = firstFreeAllocBlock >> 8;
-      firstFreeAllocBlock++;
-    }
-  // Write the directory entry into RAM (at the DMA address)
-  ram->write(ramDMA, de.buf, 32);
-}
-
 bool BDOS::sdSelect(uint8_t drive) {
   bool result = false;
   char disk[] = "A";
@@ -1039,7 +1041,7 @@ bool BDOS::sdSelect(uint8_t drive) {
   disk[0] += drive;
   // Check for directory existence
   ledOn();
-  if (file = SD.open((char*)disk, FILE_READ)) {
+  if (file = SD.open(disk, FILE_READ)) {
     result = file.isDirectory();
     file.close();
   }
@@ -1082,13 +1084,11 @@ uint8_t BDOS::sdFindFirst(char* fname, bool doDir) {
   fname2cname(fname, fPattern);
   // Keep the path in fPath
   strcpy(fPath, path);
-
-  /*
-    fileRecords = 0;
-    fileExtents = 0;
-    fileExtentsUsed = 0;
-  */
-
+  // Reset direntry file size counters
+  fRecs = 0;
+  fExts = 0;
+  fExtU = 0;
+  // Go find it
   return sdFindNext(doDir);
 }
 
@@ -1125,17 +1125,15 @@ uint8_t BDOS::sdFindNext(bool doDir) {
   return result;
 }
 
-uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
+uint8_t BDOS::sdRead(char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[BlkSZ];
   ledOn();
   // Open the file
-  file = SD.open(fname, FILE_READ);
-  // Check if the file has been open
-  if (file) {
+  if (file = SD.open(fname, FILE_READ)) {
     // Seek
     if (file.seek(fpos)) {
-      // Clear the buffer
+      // Clear the buffer (^Z)
       memset(buf, 0x1A, BlkSZ);
       // Read from file
       if (file.read(&buf[0], BlkSZ)) {
@@ -1153,7 +1151,7 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
         result = 0x06;
       else {
         uint32_t exSize = file.size();
-        // Round file size up to next full logical extent
+        // Round the file size up to next full logical extent
         exSize = ExtSZ * ((exSize / ExtSZ) + ((exSize % ExtSZ) ? 1 : 0));
         if (fpos < exSize)
           // Reading unwritten data
@@ -1172,29 +1170,39 @@ uint8_t BDOS::sdSeqRead(char* fname, uint32_t fpos) {
   return result;
 }
 
-uint8_t BDOS::sdSeqWrite(char* fname, uint32_t fpos) {
+uint8_t BDOS::sdWrite(char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[BlkSZ];
   ledOn();
-  // Check if we need to extend the file
-  if (sdExtend(fname, fpos))
-    // Open the file
-    file = SD.open(fname, FILE_WRITE);
-  // Check if the file has been open
-  if (file) {
-    // Seek
-    if (file.seek(fpos)) {
-      // Read from RAM
-      ram->read(ramDMA, buf, BlkSZ);
-      // Write to file
-      if (file.write(&buf[0], BlkSZ))
-        result = 0x00;
-      else
-        // Write error
-        result = 0x02;
-    } else
-      // Seek error
-      result = 0x06;
+  // Open the file for write
+  if (file = SD.open(fname, FILE_WRITE)) {
+    // Check if we need to seek beyond end
+    if (fpos > file.size()) {
+      // Seek to end
+      file.seek(file.size());
+      // Append
+      for (uint32_t i = 0; i < fpos - file.size(); i++)
+        if (file.write((uint8_t)0) != 1) {
+          // Disk full
+          result = 0x02;
+          break;
+        }
+    }
+    // Check if the result is unchanged
+    if (result == 0xFF)
+      // Seek
+      if (file.seek(fpos)) {
+        // Read from RAM
+        ram->read(ramDMA, buf, BlkSZ);
+        // Write to file
+        if (file.write(&buf[0], BlkSZ))
+          result = 0x00;
+        else
+          // Write error
+          result = 0x02;
+      } else
+        // Seek error
+        result = 0x06;
     // Close the file
     file.close();
   } else
@@ -1229,7 +1237,7 @@ bool BDOS::sdRename(char* fname, char* newname) {
   file = SD.open(fname, FILE_WRITE);
   if (file) {
     // FIXME
-    //if (file.rename((char*)newname)) {
+    //if (file.rename(newname)) {
     //  file.close();
     //  result = true;
     //}

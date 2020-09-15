@@ -96,8 +96,8 @@ class BDOS {
     uint32_t  sdFileSize(char* fname);
     uint8_t   sdFindFirst(char* fname, bool doDir);
     uint8_t   sdFindNext(bool doDir);
-    uint8_t   sdSeqRead(char* fname, uint32_t fpos);
-    uint8_t   sdSeqWrite(char* fname, uint32_t fpos);
+    uint8_t   sdRead(char* fname, uint32_t fpos);
+    uint8_t   sdWrite(char* fname, uint32_t fpos);
     bool      sdOpen(char* fname);
     bool      sdCreate(char* fname);
     bool      sdDelete(char* fname);
@@ -125,6 +125,11 @@ class BDOS {
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
     uint32_t  fRec;               // File record (random seek)
+
+    uint32_t  fRecs;              // File records in directory entry
+    uint16_t  fExts;              // File extents in directory entry
+    uint16_t  fExtU;              // File extents used in directory entry
+
     File      file;
     File      fDir;               // The directory to look into
 

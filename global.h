@@ -21,6 +21,7 @@
 #define GLOBAL_H
 
 #define MEM         (64 * 1024)
+#define LASTBYTE    (MEM - 1)
 #define RAMSIZE     (MEM - 0x0800)
 
 #define ROMMON      (MEM - 0x0800)
@@ -29,7 +30,7 @@
 #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00)
 #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
 // Position of the $$$.SUB FCB on this CCP
-#define BatchFCB    (CCPCODE + 0x07AC)   
+#define BatchFCB    (CCPCODE + 0x07AC)
 
 
 #define DPBADDR     (BIOSDATA + 0x40)

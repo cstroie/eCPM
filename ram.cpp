@@ -19,7 +19,7 @@
 
 #include "ram.h"
 
-RAM::RAM(int CS) {
+RAM::RAM(int CS, uint16_t bufSize) {
   cs = CS;
   pinMode(cs, OUTPUT);
   digitalWrite(cs, HIGH);
@@ -27,9 +27,16 @@ RAM::RAM(int CS) {
   digitalWrite(cs, LOW);
   delay(50);
   digitalWrite(cs, HIGH);
+
+  // Page buffer
+  this->bufSize = bufSize;
+  this->bufHalfSize = bufSize / 2;
+  // Allocate one byte more, to make room for 16-bit operations
+  buf = (uint8_t*)malloc(bufSize + 1);
 }
 
 RAM::~RAM() {
+  free(buf);
 }
 
 void RAM::init() {
@@ -68,6 +75,72 @@ void RAM::reset() {
   // End SPI transfer
   end();
 }
+
+void RAM::bufChange(uint16_t addr) {
+  // Check if the address is contained in buffer
+  if (addr > bufStart and addr < bufEnd)
+    return;
+  // Check if dirty
+  if (bufDirty) {
+    // Write back the buffer into RAM
+    write(bufStart, buf, bufSize + 1);
+    // Make it clean
+    bufDirty = false;
+  }
+  // Set new start address
+  if      (addr < bufHalfSize)
+    bufStart = 0x0000;
+  else if (addr > (LASTBYTE - bufHalfSize))
+    bufStart = LASTBYTE - bufHalfSize;
+  else
+    bufStart = addr - bufHalfSize;
+  // End address
+  bufEnd = bufStart + bufSize;
+  // Fetch the buffer from RAM
+  read(bufStart, buf, bufSize + 1);
+  // Make it clean
+  bufDirty = false;
+}
+
+uint8_t RAM::getByte(uint16_t addr) {
+  // Check if the address is included in buffer
+  if (not(addr > bufStart and addr < bufEnd))
+    // Change the buffer
+    bufChange(addr);
+  // Directly return the byte from the buffer
+  return buf[addr - bufStart];
+}
+
+void RAM::setByte(uint16_t addr, uint8_t data) {
+  // Check if the address is included in buffer
+  if (not(addr > bufStart and addr < bufEnd))
+    // Change the buffer
+    bufChange(addr);
+  // Directly set the byte into the buffer
+  buf[addr - bufStart] = data;
+  bufDirty = true;
+}
+
+uint16_t RAM::getWord(uint16_t addr) {
+  // Check if the address is included in buffer
+  if (not(addr > bufStart and addr < bufEnd))
+    // Change the buffer
+    bufChange(addr);
+  // Directly return the byte from the buffer
+  return buf[addr - bufStart] + buf[addr - bufStart + 1] * 0x0100;
+}
+
+void RAM::setWord(uint16_t addr, uint16_t data) {
+  // Check if the address is included in buffer
+  if (not(addr > bufStart and addr < bufEnd ))
+    // Change the buffer
+    bufChange(addr);
+  // Directly set the byte into the buffer
+  buf[addr - bufStart]     = lowByte(data);
+  buf[addr - bufStart + 1] = highByte(data);
+  bufDirty = true;
+}
+
 
 uint8_t RAM::readByte(uint16_t addr) {
   // Begin SPI transfer
@@ -166,6 +239,7 @@ void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
   end();
 }
 
+
 void RAM::hexdump(uint16_t start, uint16_t stop) {
   char buf[16];
   char val[4];
@@ -219,6 +293,7 @@ void RAM::hexdump(uint16_t start, uint16_t stop) {
   // End SPI transfer
   end();
 }
+
 
 void RAM::begin() {
   SPI.beginTransaction(SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));

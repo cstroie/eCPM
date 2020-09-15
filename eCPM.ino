@@ -41,22 +41,22 @@ void callBDOS(int port);
 
 
 // Persistent configuration
-RAM ram(D0);
+RAM ram(D0, 16);
 
 int  I8080::read_word(int addr) {
-  return ram.readWord(addr);
+  return ram.getWord(addr);
 }
 
 void I8080::write_word(int addr, int word) {
-  return ram.writeWord(addr, word);
+  return ram.setWord(addr, word);
 }
 
 int  I8080::read_byte(int addr) {
-  return ram.readByte(addr);
+  return ram.getByte(addr);
 }
 
 void I8080::write_byte(int addr, int byte) {
-  ram.writeByte(addr, byte);
+  ram.setByte(addr, byte);
 }
 
 int  I8080::io_input(int port) {

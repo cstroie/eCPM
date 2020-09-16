@@ -287,6 +287,7 @@ void I8080::retrieve_flags(void) {
 
 int I8080::execute(int opcode) {
   int cycles;
+  this->opcode = opcode;
   switch (opcode) {
     case 0x00:            /* nop */
     // Undocumented NOP.
@@ -1777,9 +1778,7 @@ void I8080::ret() {
 
 void I8080::trace(bool newline) {
   char buf[80];
-  //sprintf_P(buf, PSTR("%04X %04X  %02X %02X  %02X %02X  %02X %02X  %02X %02X"), PC, SP, A, F, B, C, D, E, H, L);
-  //Serial.println("  PC   SP   A  F   B  C   D  E   H  L");
-  sprintf_P(buf, PSTR("PC:%04X SP:%04X  AF:%02X%02X BC:%02X%02X DE:%02X%02X HL:%02X%02X"), PC, SP, A, F, B, C, D, E, H, L);
+  sprintf_P(buf, PSTR("\t\tPC:%04X SP:%04X  AF:%02X%02X BC:%02X%02X DE:%02X%02X HL:%02X%02X  OP:%02X\r\n"), PC, SP, A, F, B, C, D, E, H, L, opcode);
   if (newline) Serial.println();
-  Serial.println(buf);
+  Serial.print(buf);
 }

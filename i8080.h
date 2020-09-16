@@ -132,6 +132,7 @@ class I8080 {
     uns8  work8;
     int   index;
     uns8  carry, add;
+    int   opcode;
 
 };
 

@@ -69,7 +69,6 @@ void I8080::io_output(int port, int value) {
 
 void I8080::iff(int on) {
   state = 0;
-  //ram.writeByte(addr, byte);
 }
 
 

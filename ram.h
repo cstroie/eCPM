@@ -38,9 +38,10 @@ class RAM {
   public:
     RAM(int CS = SS, uint16_t bufSize = 16);
     ~RAM();
-    void init();
-    void clear();
-    void reset();
+    void      init();
+    void      clear();
+    void      reset();
+    void      flush();
     uint8_t   getByte(uint16_t addr);
     void      setByte(uint16_t addr, uint8_t data);
     uint16_t  getWord(uint16_t addr);
@@ -51,7 +52,7 @@ class RAM {
     void      writeWord(uint16_t addr, uint16_t data);
     void      read(uint16_t addr, uint8_t *buf, uint16_t len);
     void      write(uint16_t addr, uint8_t *buf, uint16_t len);
-    void      hexdump(uint16_t start = 0x0000, uint16_t stop = LASTBYTE);
+    void      hexdump(uint16_t start = 0x0000, uint16_t stop = LASTBYTE, char* comment = "");
 
   private:
     // SPI transactions

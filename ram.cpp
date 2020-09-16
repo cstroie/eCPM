@@ -76,17 +76,28 @@ void RAM::reset() {
   end();
 }
 
+// Flush the buffer, if dirty, and reset it
+void RAM::flush() {
+
+  // Check if dirty
+  if (bufDirty)
+    // Write back the buffer into RAM
+    write(bufStart, buf, bufSize + 1);
+  // Make it clean
+  bufDirty = false;
+  // Reset the start and end addresses
+  bufStart = LASTBYTE;
+  bufEnd = LASTBYTE;
+}
+
 void RAM::bufChange(uint16_t addr) {
   // Check if the address is contained in buffer
   if (addr > bufStart and addr < bufEnd)
     return;
   // Check if dirty
-  if (bufDirty) {
+  if (bufDirty)
     // Write back the buffer into RAM
     write(bufStart, buf, bufSize + 1);
-    // Make it clean
-    bufDirty = false;
-  }
   // Set new start address
   if      (addr < bufHalfSize)
     bufStart = 0x0000;
@@ -240,15 +251,23 @@ void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
 }
 
 
-void RAM::hexdump(uint16_t start, uint16_t stop) {
+void RAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
   char buf[16];
   char val[4];
   uint8_t data;
   // Adjust start and stop addresses
   start &= 0xFFF0;
   stop  |= 0x000F;
+  // Flush the buffer
+  flush();
   // Start with a new line
   Serial.print("\r\n");
+  // Print the comment
+  if (comment[0]) {
+    Serial.print("; ");
+    Serial.print(comment);
+    Serial.print("\r\n");
+  }
   // Begin SPI transfer
   begin();
   // Command
@@ -285,10 +304,11 @@ void RAM::hexdump(uint16_t start, uint16_t stop) {
       Serial.write(' ');
     }
     // Print the ASCII column
+    Serial.write('|');
     for (uint8_t idx = 0; idx < 0x10; idx++)
       Serial.write(buf[idx]);
     // New line
-    Serial.print("\r\n");
+    Serial.print("|\r\n");
   }
   // End SPI transfer
   end();

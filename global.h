@@ -27,13 +27,15 @@
 #define ROMMON      (MEM - 0x0800)
 #define BIOSDATA    (MEM - 0x0800 - 0x0380)
 #define BIOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380)
+#define BIOSENTRY   (BIOSCODE + 0x40)
+#define BIOSDPB     (BIOSDATA + 0x80)
 #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00)
+#define BDOSENTRY   (BDOSCODE + 0x10)
 #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
 // Position of the $$$.SUB FCB on this CCP
 #define BatchFCB    (CCPCODE + 0x07AC)
 
 
-#define DPBADDR     (BIOSDATA + 0x40)
 
 #define TBASE       (0x0100)        // TPA - Transient Program Area
 #define CBASE       (CCPCODE)       // Used for sanity checks

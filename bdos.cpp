@@ -29,20 +29,20 @@ BDOS::~BDOS() {
 void BDOS::init() {
   // Serial number, 6 bytes
   uint8_t cpmSerialNo[] = {0, 22, 0, 0, 0, 0};
-  ram->write(BDOSCODE, cpmSerialNo, 6);
+  ram->write(BDOSCODE, cpmSerialNo, sizeof(cpmSerialNo));
 
   // BDOS entry (FBASE)
-  ram->writeByte(BDOSCODE + 6, 0xC3);          // JP
-  ram->writeWord(BDOSCODE + 7, BDOSCODE + 0x0100);
+  ram->setByte(BDOSCODE + 6, 0xC3);       // JP BDOSENTRY
+  ram->setWord(BDOSCODE + 7, BDOSENTRY);
 
   // BDOS dispatcher (FBASE1)
-  ram->writeByte(BDOSCODE + 0x0100,     0xDB); // IN A
-  ram->writeByte(BDOSCODE + 0x0100 + 1, 0x00);
-  ram->writeByte(BDOSCODE + 0x0100 + 2, 0xC9); // RET
+  ram->setByte(BDOSENTRY,     0xDB);      // IN A, (0x00)
+  ram->setByte(BDOSENTRY + 1, 0x00);
+  ram->setByte(BDOSENTRY + 2, 0xC9);      // RET
 
 #ifdef DEBUG
-  ram->hexdump(BDOSCODE, 16);
-  ram->hexdump(BDOSCODE + 0x0100, 16);
+  ram->hexdump(BDOSCODE,  BDOSCODE  + 0x10, "BDOS");
+  ram->hexdump(BDOSENTRY, BDOSENTRY + 0x10, "BDOS ENTRY");
 #endif
 }
 
@@ -134,22 +134,22 @@ void BDOS::call(uint16_t port) {
 
     case 0x07:  // GETIOB
       // Function to return the i/o byte.
-      cpu->regHL(ram->readByte(IOBYTE));
+      cpu->regHL(ram->getByte(IOBYTE));
       break;
 
     case 0x08:  // SETIOB
       // Function to set the i/o byte.
-      ram->writeByte(IOBYTE, cpu->regE());
+      ram->setByte(IOBYTE, cpu->regE());
       break;
 
     case 0x09:  // PRTSTR
       // Function to print the character string pointed to by (DE)
       // on the console device. The string ends with a '$'.
       w = cpu->regDE();
-      b = ram->readByte(w++);
+      b = ram->getByte(w++);
       while (b != '$') {
         bios->conout(b);
-        b = ram->readByte(w++);
+        b = ram->getByte(w++);
       }
       cpu->regDE(w);
       break;
@@ -162,7 +162,7 @@ void BDOS::call(uint16_t port) {
       // (DE) = First char
       // Get the number of characters to read
       w = cpu->regDE();
-      b = ram->readByte(w);
+      b = ram->getByte(w);
       w++;
       count = 0;
       // Very simple line input
@@ -191,13 +191,13 @@ void BDOS::call(uint16_t port) {
           // ^R
           Serial.write("#\r\n   ");
           for (uint8_t j = 1; j <= count; ++j)
-            bios->conout(ram->readByte(w + j));
+            bios->conout(ram->getByte(w + j));
         }
         else if (c == 21) {
           // ^U
           Serial.write("#\r\n   ");
           w = cpu->regDE();
-          b = ram->readByte(w);
+          b = ram->getByte(w);
           w++;
           count = 0;
         }
@@ -206,7 +206,7 @@ void BDOS::call(uint16_t port) {
           for (uint8_t j = 0; j < count; ++j)
             Serial.write("\b \b");
           w = cpu->regDE();
-          b = ram->readByte(w);
+          b = ram->getByte(w);
           w++;
           count = 0;
         }
@@ -215,13 +215,13 @@ void BDOS::call(uint16_t port) {
           continue;
         bios->conout(c);
         ++count;
-        ram->writeByte(w + count, c);
+        ram->setByte(w + count, c);
         // Reached the expected count
         if (count == b)
           break;
       }
       // Save the number of characters read
-      ram->writeByte(w, count);
+      ram->setByte(w, count);
       // Gives a visual feedback that read ended
       bios->conout('\r');
       break;
@@ -545,7 +545,7 @@ void BDOS::call(uint16_t port) {
         if (!(rwoVector & (1 << fcb.dr))) {
           uint16_t ramNewFCB = ramFCB + 16;
           // Prevents rename from moving files among drives
-          ram->writeByte(ramNewFCB, ram->readByte(ramFCB));
+          ram->setByte(ramNewFCB, ram->getByte(ramFCB));
           // Create the new FCB object
           FCB_t newfcb;
           ram->read(ramNewFCB, newfcb.buf, 36);
@@ -606,7 +606,7 @@ void BDOS::call(uint16_t port) {
 
     case 0x1F:  // GETPARM
       // Function to return the address of the disk parameter block for the current drive.
-      cpu->regHL(DPBADDR);
+      cpu->regHL(BIOSDPB);
       break;
 
     case 0x20:  // GETUSER

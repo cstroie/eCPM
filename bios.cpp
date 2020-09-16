@@ -27,34 +27,31 @@ BIOS::~BIOS() {
 }
 
 void BIOS::init() {
-  uint16_t offset;
+  uint16_t j;
   // Patch in the BIOS jump vectors (17 functions)
   for (uint8_t i = 0; i < 17; i++) {
-    offset = i * 3;
+    // Compute an offset
+    j = i * 3;
     // BIOS jump vectors
-    ram->writeByte(BIOSCODE + offset, 0xC3);               // JP
-    ram->writeWord(BIOSCODE + offset + 1, BIOSCODE + 0x0100 + offset);
+    ram->setByte(BIOSCODE + j,      0xC3);          // JP BIOSENTRY + j
+    ram->setWord(BIOSCODE + j + 1,  BIOSENTRY + j);
     // BIOS routines
-    ram->writeByte(BIOSCODE + 0x0100 + offset,     0xD3);  // OUT A
-    ram->writeByte(BIOSCODE + 0x0100 + offset + 1, i);
-    ram->writeByte(BIOSCODE + 0x0100 + offset + 2, 0xC9);  // RET
+    ram->setByte(BIOSENTRY + j,     0xD3);          // OUT (i), A
+    ram->setByte(BIOSENTRY + j + 1, i);
+    ram->setByte(BIOSENTRY + j + 2, 0xC9);          // RET
   }
 
   // Define the DPB
-  //uint8_t bufDPB[15];
-  //DPB* dpb = (DPB*)bufDPB;
-  //ram->write(DPBADDR, bufDPB, 15);
-
   // DPB_t dpb = {.spt = 0x0040, .bsh = 0x05, .blm = 0x1F, .exm = 0x01, .dsm = 0x07FF, .drm = 0x03FF, .al0 = 0xFF, .al1 = 0x00, .cks = 0x0000, .off = 0x0002};
   dpb = {0x0040, 0x05, 0x1F, 0x01, 0x07FF, 0x03FF, 0xFF, 0x00, 0x0000, 0x0002};
-  ram->write(DPBADDR, dpb.buf, 16);
+  ram->write(BIOSDPB, dpb.buf, 16);
 
   // Load CCP
   loadCCP();
 
 #ifdef DEBUG
-  ram->hexdump(BIOSCODE, offset);
-  ram->hexdump(BIOSCODE + 0x0100, offset);
+  ram->hexdump(BIOSCODE,  BIOSCODE  + j, "BIOS");
+  ram->hexdump(BIOSENTRY, BIOSENTRY + j, "BIOS ENTRY");
 #endif
 }
 
@@ -165,8 +162,8 @@ void BIOS::call(uint16_t code) {
 void BIOS::boot() {
   signon();
   // Clear IOBYTE and TDRIVE
-  ram->writeByte(IOBYTE, 0x00);  // 0x3D
-  ram->writeByte(TDRIVE, 0x00);
+  ram->setByte(IOBYTE, 0x00);  // 0x3D
+  ram->setByte(TDRIVE, 0x00);
   // Go to CP/M
   gocpm();
 }
@@ -279,21 +276,29 @@ void BIOS::sectran() {
 
 void BIOS::signon() {
   Serial.print("\r\n64K CP/M v2.2 (eCPM 0.1)\r\n");
+  char buf[80];
+  sprintf_P(buf, PSTR("BIOS:%04X  BDTA:%04X  BDOS:%04X   CCP:%04X   DPB:%04X\r\n"),
+            BIOSCODE, BIOSDATA, BDOSCODE, CCPCODE, BIOSDPB);
+  Serial.print(buf);
 }
 
 void BIOS::gocpm() {
   // Patch in a JP to WBOOT at location 0x0000
-  ram->writeByte(0x0000, 0xC3);  // JP
-  ram->writeWord(0x0001, WBOOT);
+  ram->setByte(0x0000, 0xC3);  // JP
+  ram->setWord(0x0001, WBOOT);
   //  Patch in a JP to the BDOS entry at location 0x0005
-  ram->writeByte(ENTRY, 0xC3);   // JP
-  ram->writeWord(ENTRY + 1, BDOSCODE + 0x06);
+  ram->setByte(ENTRY, 0xC3);   // JP
+  ram->setWord(ENTRY + 1, BDOSCODE + 0x06);
   // Last loged disk number
-  cpu->regC(ram->readByte(TDRIVE));
+  cpu->regC(ram->getByte(TDRIVE));
   // Jump to CCP
   cpu->jump(CCPCODE);
 }
 
+// Load CCP at CCPCODE address
 void BIOS::loadCCP() {
   ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
+#ifdef DEBUG
+  ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
+#endif
 }

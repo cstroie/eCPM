@@ -76,7 +76,7 @@ class BDOS {
     void init();
     void call(uint16_t port);
 
-    uint8_t selDrive(uint8_t drive);
+    bool    selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);
 
   private:

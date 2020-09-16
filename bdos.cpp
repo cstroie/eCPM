@@ -47,8 +47,8 @@ void BDOS::init() {
 }
 
 void BDOS::bdosError(uint8_t err) {
-  Serial.print("Bdos Err On ");
-  Serial.print(cDrive + 'A');
+  Serial.print("\r\nBdos Err On ");
+  Serial.print((char)(cDrive + 'A'));
   Serial.print(" : ");
   switch (err) {
     case 1:
@@ -249,12 +249,17 @@ void BDOS::call(uint16_t port) {
 
     case 0x0E:  // SETDSK
       // Function to set the active disk number.
-      tDrive = cpu->regE() & 0x0F;
-      if (cDrive != tDrive)
-        if (drv->selDrive(tDrive)) {
-          cDrive = tDrive;
-          logVector = logVector | (1 << cDrive);
-        }
+      result = 0xFF;
+      tDrive = cpu->regE();
+      if ((tDrive <= 0x0F) and (drv->selDrive(tDrive))) {
+        cDrive = tDrive;
+        logVector = logVector | (1 << cDrive);
+        result = 0x00;
+      }
+      else
+        bdosError(0x02);
+      // Return the result in HL
+      cpu->regHL(result);
       break;
 
     case 0x0F:  // OPENFIL
@@ -265,7 +270,7 @@ void BDOS::call(uint16_t port) {
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Try to open it
@@ -298,7 +303,7 @@ void BDOS::call(uint16_t port) {
       // Clear S2
       fcb.s2 = 0x00;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the file has been modifed
         if (!(fcb.s2 & 0x80)) {
           // Check if the drive is write protected
@@ -331,13 +336,13 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Keep the drive letter, user hexcode and CP/M filename
         // (pattern, actually) in fName: 'A0???????????'
-        fName[FNDRIVE] = fcb.dr + 'A';
-        fName[FNUSER] = toHEX(cUser);
+        fName[FNDRIVE] = (fcb.dr && fcb.dr != '?') ? (fcb.dr + 'A' - 1) : (cDrive + 'A');
+        fName[FNUSER]  = toHEX(cUser);
         memcpy(fName + FNFILE, fcb.fn, 11);
-        fName[FNZERO] = '\0';
+        fName[FNZERO]  = '\0';
         // Check if we need to find for all users
         fAllUsers = fcb.dr == '?';
         if (fAllUsers)
@@ -364,7 +369,7 @@ void BDOS::call(uint16_t port) {
       // Function to return the next occurence of a file name.
       result = 0xFF;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         if (fAllUsers)
           result = drv->findNext(fName, fSize);
         else
@@ -385,7 +390,7 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Keep the drive letter, user hexcode and CP/M filename
@@ -425,7 +430,7 @@ void BDOS::call(uint16_t port) {
              (fcb.ex * BlkEX * BlkSZ) +
              (fcb.cr * BlkSZ);
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
@@ -463,7 +468,7 @@ void BDOS::call(uint16_t port) {
              (fcb.ex * BlkEX * BlkSZ) +
              (fcb.cr * BlkSZ);
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
@@ -505,7 +510,7 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
@@ -540,7 +545,7 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM, address in DE
       readFCB();
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           uint16_t ramNewFCB = ramFCB + 16;
@@ -629,7 +634,7 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Get the filename on SD card
         fcb2fname(fcb, fName);
         // Read one block
@@ -657,7 +662,7 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
@@ -690,7 +695,7 @@ void BDOS::call(uint16_t port) {
       // Read the FCB from RAM
       readFCB();
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // TODO Find the file
         // Get the filename on SD card
         fcb2fname(fcb, fName);
@@ -752,7 +757,7 @@ void BDOS::call(uint16_t port) {
       fRec = fcb.r2 * 0x010000UL + fcb.r1 * 0x0100UL + fcb.r0;
       fPos = fRec * BlkSZ;
       // Select the drive
-      if (drv->selDrive(fcb.dr)) {
+      if (selDrive(fcb.dr)) {
         // Check if the drive is write protected
         if (!(rwoVector & (1 << fcb.dr))) {
           // Get the filename on SD card
@@ -904,22 +909,28 @@ void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
   ram->write(ramDMA, de.buf, 32);
 }
 
-uint8_t BDOS::selDrive(uint8_t drive) {
-  uint8_t result = 0xFF;
+// Autoselect the drive.
+// 0 or ?: use the current drive
+// 1-16  : substract 1
+bool BDOS::selDrive(uint8_t drive) {
+  uint8_t result = false;
   // Check if the drive is specified
   if (!drive || drive == '?')
     // Use the current drive
     drive = cDrive;
+  else
+    // Use A=0, B=1, ...
+    drive--;
   // Check if the drive exists (as directory on SD)
   if (drv->selDrive(drive)) {
     // Set the drive log in vector
     logVector = logVector | (1 << drive);
-    result = 0x00;
+    result = true;
   } else
     // Return and display error
     bdosError(2);
   // Return the status
-  return (result);
+  return result;
 }
 
 // Convert FCB to host file name

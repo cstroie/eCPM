@@ -20,6 +20,17 @@
 #include "bdos.h"
 #include <SD.h>
 
+// BDOS CALLS
+const char* BDOS_CALLS[] = {"WBOOT", "GETCON", "OUTCON", "GETRDR", "PUNCH", "LIST",
+                            "DIRCIO", "GETIOB", "SETIOB", "PRTSTR", "RDBUFF", "GETCSTS",
+                            "GETVER", "RSTDSK", "SETDSK", "OPENFIL", "CLOSEFIL",
+                            "GETFST", "GETNXT", "DELFILE", "READSEQ", "WRTSEQ",
+                            "FCREATE", "RENFILE", "GETLOG", "GETCRNT", "PUTDMA",
+                            "GETALOC", "WRTPRTD", "GETROV", "SETATTR", "GETPARM",
+                            "GETUSER", "RDRANDOM", "WTRANDOM", "FILESIZE", "SETRAN",
+                            "LOGOFF", "RTN", "RTN", "WTSPECL",
+                           };
+
 BDOS::BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios): cpu(cpu), ram(ram), drv(drv), bios(bios) {
 }
 
@@ -46,42 +57,29 @@ void BDOS::init() {
 #endif
 }
 
-void BDOS::bdosError(uint8_t err) {
-  Serial.print("\r\nBdos Err On ");
-  Serial.print((char)(cDrive + 'A'));
-  Serial.print(" : ");
-  switch (err) {
-    case 1:
-      Serial.print("Bad Sector");
-      break;
-    case 2:
-      Serial.print("Select");
-      break;
-    case 3:
-      Serial.print("File R/O");
-      break;
-    case 4:
-      Serial.print("R/O");
-      break;
-  }
-  Serial.print("\r\n");
-  // Wait for a keypress
-  bios->conin();
-  // Always reboot on these errors.
-  bios->wboot();
-}
-
-
 void BDOS::call(uint16_t port) {
   uint16_t  w;
   uint8_t   b, count;
   char      c;
 
+  uint8_t   regC = cpu->regC();
+#ifdef DEBUG
+  Serial.print("\r\n\t\tBDOS call 0x");
+  Serial.print(regC, HEX);
+  if (regC <= 41) {
+    Serial.print("\t");
+    Serial.print(BDOS_CALLS[regC]);
+  }
+  Serial.print("\r\n");
+  cpu->trace();
+#endif
+
   // HL is reset by the BDOS
   cpu->regHL(0x0000);
-  //cpu->trace();
+  cpu->regC(cpu->regE());
 
-  switch (cpu->regC()) {
+  // Dispatch call
+  switch (regC) {
     case 0x00:  // WBOOT
       // System reset
       bios->wboot();
@@ -250,14 +248,17 @@ void BDOS::call(uint16_t port) {
     case 0x0E:  // SETDSK
       // Function to set the active disk number.
       result = 0xFF;
-      tDrive = cpu->regE();
-      if ((tDrive <= 0x0F) and (drv->selDrive(tDrive))) {
-        cDrive = tDrive;
-        logVector = logVector | (1 << cDrive);
+      // Save the current drive number
+      tDrive = cDrive;
+      // Change the drive
+      cDrive = cpu->regE();
+      // Check it
+      if (selDrive(cDrive + 1))
+        // Success
         result = 0x00;
-      }
       else
-        bdosError(0x02);
+        // Error, restore the current drive
+        cDrive = tDrive;
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -788,7 +789,7 @@ void BDOS::call(uint16_t port) {
 #ifdef DEBUG
       // Show unimplemented BDOS calls only when debugging
       Serial.print("\r\nUnimplemented BDOS call 0x");
-      Serial.print(cpu->regC(), HEX);
+      Serial.print(regC, HEX);
       Serial.print("\r\n");
       cpu->trace();
 #endif
@@ -803,7 +804,33 @@ void BDOS::call(uint16_t port) {
 }
 
 
-
+void BDOS::bdosError(uint8_t err) {
+  Serial.print("\r\nBdos Err On ");
+  Serial.print((char)(cDrive + 'A'));
+  Serial.print(" : ");
+  switch (err) {
+    case 1:
+      Serial.print("Bad Sector");
+      break;
+    case 2:
+      Serial.print("Select");
+      break;
+    case 3:
+      Serial.print("File R/O");
+      break;
+    case 4:
+      Serial.print("R/O");
+      break;
+  }
+  Serial.print("\r\n");
+  // Wait for a keypress
+  bios->conin();
+  // Restore the TDRIVE byte
+  cDrive = tDrive;
+  ram->setByte(TDRIVE, cUser << 4 | cDrive);
+  // Always reboot on these errors.
+  bios->wboot();
+}
 
 // Read the FCB from RAM, register DE has the address.
 // Store the address in ramFCB and the FCB in fcb

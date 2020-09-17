@@ -284,10 +284,10 @@ void BIOS::signon() {
 
 void BIOS::gocpm() {
   // Patch in a JP to WBOOT at location 0x0000
-  ram->setByte(0x0000, 0xC3);  // JP
+  ram->setByte(0x0000, 0xC3);   // JP WBOOT
   ram->setWord(0x0001, WBOOT);
   //  Patch in a JP to the BDOS entry at location 0x0005
-  ram->setByte(ENTRY, 0xC3);   // JP
+  ram->setByte(ENTRY, 0xC3);    // JP BDOSCODE + 0x06
   ram->setWord(ENTRY + 1, BDOSCODE + 0x06);
   // Last loged disk number
   cpu->regC(ram->getByte(TDRIVE));

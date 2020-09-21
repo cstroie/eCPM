@@ -88,7 +88,7 @@ class BDOS {
     void      bdosError(uint8_t err);
     void      readFCB();
     void      writeFCB();
-    void      showFCB();
+    void      showFCB(char* comment = "");
     void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
 
@@ -104,7 +104,8 @@ class BDOS {
     FCB_t     fcb;                // FCB object
     char      fName[128];         // Filename
     char      cName[12];          // CP/M file name
-    bool      fAllUsers;          // Find files for all users
+    bool      fAllUsers;          // Find files from all users
+    bool      fAllExnts;          // Report all extents
     uint32_t  fSize;              // File size
     uint32_t  fPos;               // File position (seek)
     uint32_t  fRec;               // File record (random seek)
@@ -112,6 +113,7 @@ class BDOS {
     uint32_t  fRecs;              // File records in directory entry
     uint16_t  fExts;              // File extents in directory entry
     uint16_t  fExtU;              // File extents used in directory entry
+    uint16_t  fAllB;              // First free allocation block
 
     uint16_t  result;             // Result from BDOS functions
 };

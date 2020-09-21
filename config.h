@@ -21,7 +21,7 @@
 #define CONFIG_H
 
 // Debug mode
-#define DEBUG 1
+//#define DEBUG 1
 
 // EEPROM debug mode
 //#define DEBUG_EE
@@ -30,7 +30,7 @@
 #define SERIAL_SPEED  (115200)
 
 // SPI speed
-#define SPI_SPEED (16000000)
+#define SPI_SPEED (20000000)
 
 // LED configuration
 #define LEDinv  (true)

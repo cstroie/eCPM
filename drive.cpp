@@ -141,20 +141,28 @@ uint8_t DRIVE::findNext(char *fname, uint32_t &fsize) {
   return result;
 }
 
+// Check if there is a "$$$.SUB" file on the A drive
+uint8_t DRIVE::checkSUB() {
+  // Filename and file size (not used)
+  char      fName[128] = "A0$???????.SUB";
+  uint32_t  fSize;
+  return (findFirst(fName, fSize) == 0x00) ? 0xFF : 0x00;
+}
+
 uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
-  uint8_t buf[BlkSZ];
+  uint8_t buf[sizBK];
   ledOn();
   // Open the file
   if (file = SD.open(fname, FILE_READ)) {
     // Seek
     if (file.seek(fpos)) {
       // Clear the buffer (^Z)
-      memset(buf, 0x1A, BlkSZ);
+      memset(buf, 0x1A, sizBK);
       // Read from file
-      if (file.read(&buf[0], BlkSZ)) {
+      if (file.read(&buf[0], sizBK)) {
         // Write into RAM
-        ram->write(ramDMA, buf, BlkSZ);
+        ram->write(ramDMA, buf, sizBK);
         result = 0x00;
       }
       else
@@ -162,13 +170,13 @@ uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
         result = 0x01;
     } else {
       // Seek error
-      if (fpos >= 0x010000UL * BlkSZ)
+      if (fpos >= 0x010000UL * sizBK)
         // Seek past 8MB (largest file size in CP/M)
         result = 0x06;
       else {
         uint32_t exSize = file.size();
         // Round the file size up to next full logical extent
-        exSize = ExtSZ * ((exSize / ExtSZ) + ((exSize % ExtSZ) ? 1 : 0));
+        exSize = sizEX * ((exSize / sizEX) + ((exSize % sizEX) ? 1 : 0));
         if (fpos < exSize)
           // Reading unwritten data
           result = 0x01;
@@ -188,7 +196,7 @@ uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
 
 uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
-  uint8_t buf[BlkSZ];
+  uint8_t buf[sizBK];
   ledOn();
   // Open the file for write
   if (file = SD.open(fname, FILE_WRITE)) {
@@ -209,9 +217,9 @@ uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
       // Seek
       if (file.seek(fpos)) {
         // Read from RAM
-        ram->read(ramDMA, buf, BlkSZ);
+        ram->read(ramDMA, buf, sizBK);
         // Write to file
-        if (file.write(&buf[0], BlkSZ))
+        if (file.write(&buf[0], sizBK))
           result = 0x00;
         else
           // Write error
@@ -267,7 +275,7 @@ bool DRIVE::truncate(char* fname, uint8_t rc) {
   bool result = false;
   ledOn();
   if (file = SD.open(fname, FILE_WRITE))
-    if (file.truncate(rc * BlkSZ)) {
+    if (file.truncate(rc * sizBK)) {
       file.close();
       result = true;
     }

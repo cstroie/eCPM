@@ -35,6 +35,7 @@ class DRIVE {
     uint32_t  fileSize(char* fname);
     uint8_t   findFirst(char* fname, uint32_t &fsize);
     uint8_t   findNext(char* fname, uint32_t &fsize);
+    uint8_t   checkSUB();
     uint8_t   read(uint16_t ramDMA, char* fname, uint32_t fpos);
     uint8_t   write(uint16_t ramDMA, char* fname, uint32_t fpos);
     bool      open(char* fname);

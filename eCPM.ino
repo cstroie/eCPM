@@ -99,7 +99,7 @@ void setup() {
   SPI.begin();
   // SD card
   Serial.print("\r\nInitializing SD card... ");
-  if (!SD.begin(SS)) {
+  if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
     Serial.println(" failed!");
     while (1);
   }

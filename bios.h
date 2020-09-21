@@ -26,6 +26,23 @@
 #include "i8080.h"
 #include "ram.h"
 
+
+struct DPH_t {
+  union {
+    struct {
+      uint16_t  xlt;  // Address of the logical-to-physical translation vector
+      uint16_t  sp1;  // Scratch pad 1
+      uint16_t  sp2;  // Scratch pad 2
+      uint16_t  sp3;  // Scratch pad 3
+      uint16_t  dbf;  // Address of a 128-byte scratch pad area for directory operations
+      uint16_t  dpb;  // Address of a disk parameter block for this drive
+      uint16_t  csv;  // Address of a 16-byte scratch pad area used for software check for changed disks
+      uint16_t  alv;  // Address of a 32-byte scratch pad area for disk storage allocation information
+    };
+    uint8_t buf[16];
+  };
+};
+
 struct DPB_t {
   union {
     struct {
@@ -72,6 +89,7 @@ class BIOS {
     uint8_t listst();
     void    sectran();
 
+    DPH_t   dph;
     DPB_t   dpb;
 
   private:

@@ -41,9 +41,42 @@ void BIOS::init() {
     ram->setByte(BIOSENTRY + j + 2, 0xC9);          // RET
   }
 
+  // Define the DPH (use only one DPH, since BDOS is emulated)
+  dph = {0x0000, 0x0000, 0x0000, 0x0000, DIRBUF, BIOSDPB, BIOSDATA, BIOSDATA + 0x0010};
+  ram->write(BIOSDPH, dph.buf, 16);
+
   // Define the DPB
-  // DPB_t dpb = {.spt = 0x0040, .bsh = 0x05, .blm = 0x1F, .exm = 0x01, .dsm = 0x07FF, .drm = 0x03FF, .al0 = 0xFF, .al1 = 0x00, .cks = 0x0000, .off = 0x0002};
-  dpb = {0x0040, 0x05, 0x1F, 0x01, 0x07FF, 0x03FF, 0xFF, 0x00, 0x0000, 0x0002};
+  // Disc size    DKS:  8MB = 0x00800000    => DSM = DKS / BLS - 1
+  // Block size   BLS:  4KB = 0x01000
+
+  //   BLS  BSH BLM   EXM       DRM
+  //  1024    3   7     0   -    32*AL
+  //  2048    4  15     1   0    64*AL
+  //* 4096    5  31     3   1   128*AL
+  //  8192    6  63     7   3   256*AL
+  // 16384    7 127    15   7   512*AL
+
+  // Total number of sectors per track
+  dpb.spt = 0x0100;
+  // Data allocation block shift factor
+  dpb.bsh = 0x05;
+  // Data allocation block mask (2^[BSH-1])
+  dpb.blm = 0x1F;
+  // Extent mask
+  dpb.exm = 0x0001;
+  // Maximum data block number (in BLS units)
+  dpb.dsm = 0x07FF;
+  // Total number of directory entries ()
+  dpb.drm = 0x03FF;
+  // Allocation of reserved directory blocks (8 bits)
+  dpb.al0 = 0xFF;
+  dpb.al1 = 0x00;
+  // Size of the directory check vector (fixed media)
+  dpb.cks = 0x0000;
+  // Number of reserved tracks at the beginning of the disk
+  dpb.off = 0x02;
+
+  // Write the DPB into RAM
   ram->write(BIOSDPB, dpb.buf, 16);
 
   // Load CCP
@@ -230,7 +263,13 @@ void BIOS::home() {
 
 // Select disk given by register C
 void BIOS::seldsk() {
-  cpu->regHL(0x0000);
+  // FIXME A responsibility of the SELDSK subroutine
+  // is to return the base address of the DPH for
+  // the selected drive. The following sequence of
+  // operations returns the table address, with a
+  // 0000H returned if the selected drive does not exist.
+  // SEE http://www.gaby.de/cpm/manuals/archive/cpm22htm/ch6.htm
+  cpu->regHL(BIOSDPH);
 }
 
 // Set track address given by C
@@ -297,7 +336,8 @@ void BIOS::gocpm() {
 
 // Load CCP at CCPCODE address
 void BIOS::loadCCP() {
-  ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
+  //ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
+  ram->write(CCPCODE, CCP_DR_64K, CCP_DR_64K_len);
 #ifdef DEBUG
   ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
 #endif

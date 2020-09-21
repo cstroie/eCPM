@@ -24,14 +24,27 @@
 #define LASTBYTE    (MEM - 1)
 #define RAMSIZE     (MEM - 0x0800)
 
-#define ROMMON      (MEM - 0x0800)
-#define BIOSDATA    (MEM - 0x0800 - 0x0380)
-#define BIOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380)
-#define BIOSENTRY   (BIOSCODE + 0x40)
-#define BIOSDPB     (BIOSDATA + 0x80)
-#define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00)
-#define BDOSENTRY   (BDOSCODE + 0x10)
-#define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
+/*
+  #define ROMMON      (MEM - 0x0800)
+  #define BIOSDATA    (MEM - 0x0800 - 0x0380)
+  #define BIOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380)
+  #define BIOSENTRY   (BIOSCODE + 0x0040)
+  #define BIOSDPB     (BIOSDATA + 0x0080)
+  #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 + 0x0100)
+  #define BDOSENTRY   (BDOSCODE + 0x0010)
+  #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
+*/
+
+#define BIOSCODE    (MEM - 0x0200)        // 0xFE00
+#define BIOSENTRY   (BIOSCODE + 0x0040)   // 0xFE40
+#define BIOSDATA    (BIOSCODE + 0x0100)   // 0xFF00
+#define BIOSDPH     (BIOSDATA + 0x0030)   // 0xFF80
+#define BIOSDPB     (BIOSDATA + 0x0040)   // 0xFF80
+#define BDOSCODE    (MEM - 0x0400)        // 0xFC00
+#define DIRBUF      (BDOSCODE + 0x0100)   // 0xFD00
+#define BDOSENTRY   (BDOSCODE + 0x0010)   // 0xFC10
+#define CCPCODE     (MEM - 0x0C00)        // 0xF400
+
 // Position of the $$$.SUB FCB on this CCP
 #define BatchFCB    (CCPCODE + 0x07AC)
 
@@ -67,14 +80,14 @@
 #define SECTRN      (BIOSCODE + 0x30)
 
 /* CP/M disk definitions */
-#define BlkSZ 128  // CP/M block size
-#define BlkEX 128  // Number of blocks in extent
-#define ExtSZ (BlkSZ * BlkEX)
-#define BlkS2 4096  // Number of blocks on a S2 (module)
-#define MaxEX 31  // Maximum value the EX field can take
-#define MaxS2 15  // Maximum value the S2 (modules) field can take - Can be set to 63 to emulate CP/M Plus
-#define MaxCR 128 // Maximum value the CR field can take
-#define MaxRC 128 // Maximum value the RC field can take
+#define sizBK 128               // CP/M block size (bytes)
+#define recEX 128               // Number of records in extent
+#define sizEX (sizBK * recEX)   // Extent size (bytes)
+#define blkS2 4096              // Number of blocks in S2
+#define maxEX 31                // Maximum value the EX field can take
+#define maxS2 15                // Maximum value the S2 field can take
+#define maxCR 128               // Maximum value the CR field can take
+#define maxRC 128               // Maximum value the RC field can take
 
 // File name combined char string
 #define FNDRIVE   0

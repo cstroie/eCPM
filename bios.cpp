@@ -56,28 +56,45 @@ void BIOS::init() {
   //  8192    6  63     7   3   256*AL
   // 16384    7 127    15   7   512*AL
 
-  // Total number of sectors per track
-  dpb.spt = 0x0100;
-  // Data allocation block shift factor
-  dpb.bsh = 0x05;
-  // Data allocation block mask (2^[BSH-1])
-  dpb.blm = 0x1F;
-  // Extent mask
-  dpb.exm = 0x0001;
-  // Maximum data block number (in BLS units)
-  dpb.dsm = 0x07FF;
-  // Total number of directory entries ()
-  dpb.drm = 0x03FF;
-  // Allocation of reserved directory blocks (8 bits)
-  dpb.al0 = 0xFF;
+#ifdef BLS_2048
+  dpb.spt = 0x0020; // Total number of sectors per track
+  dpb.bsh = 0x04;   // Data allocation block shift factor
+  dpb.blm = 0x0F;   // Data allocation block mask (2^[BSH-1])
+  dpb.exm = 0x00;   // Extent mask
+  dpb.dsm = 0x07FF; // Maximum data block number (in BLS units)
+  dpb.drm = 0x01FF; // Total number of directory entries
+  dpb.al0 = 0xFF;   // Allocation of reserved directory blocks (8 bits)
   dpb.al1 = 0x00;
-  // Size of the directory check vector (fixed media)
-  dpb.cks = 0x0000;
-  // Number of reserved tracks at the beginning of the disk
-  dpb.off = 0x02;
+  dpb.cks = 0x0000; // Size of the directory check vector (fixed media)
+  dpb.off = 0x0002; // Number of reserved tracks at the beginning of the disk
+#else
+  dpb.spt = 0x0020; // Total number of sectors per track
+  dpb.bsh = 0x05;   // Data allocation block shift factor
+  dpb.blm = 0x1F;   // Data allocation block mask (2^[BSH-1])
+  dpb.exm = 0x01;   // Extent mask
+  dpb.dsm = 0x07FF; // Maximum data block number (in BLS units)
+  dpb.drm = 0x03FF; // Total number of directory entries
+  dpb.al0 = 0xFF;   // Allocation of reserved directory blocks (8 bits)
+  dpb.al1 = 0x00;
+  dpb.cks = 0x0000; // Size of the directory check vector (fixed media)
+  dpb.off = 0x0002; // Number of reserved tracks at the beginning of the disk
+#endif
 
   // Write the DPB into RAM
-  ram->write(BIOSDPB, dpb.buf, 16);
+  // Because of the byte alignment on 32-bit CPU,
+  // we need to store each field separately
+  uint16_t addr = BIOSDPB;
+  ram->setWord(addr++, dpb.spt); addr++;
+  ram->setByte(addr++, dpb.bsh);
+  ram->setByte(addr++, dpb.blm);
+  ram->setByte(addr++, dpb.exm);
+  ram->setWord(addr++, dpb.dsm); addr++;
+  ram->setWord(addr++, dpb.drm); addr++;
+  ram->setByte(addr++, dpb.al0);
+  ram->setByte(addr++, dpb.al1);
+  ram->setWord(addr++, dpb.cks); addr++;
+  ram->setWord(addr++, dpb.off);
+  ram->flush();
 
   // Load CCP
   loadCCP();

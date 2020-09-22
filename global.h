@@ -20,29 +20,18 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+/* Memory size */
 #define MEM         (64 * 1024)
 #define LASTBYTE    (MEM - 1)
-#define RAMSIZE     (MEM - 0x0800)
-
-/*
-  #define ROMMON      (MEM - 0x0800)
-  #define BIOSDATA    (MEM - 0x0800 - 0x0380)
-  #define BIOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380)
-  #define BIOSENTRY   (BIOSCODE + 0x0040)
-  #define BIOSDPB     (BIOSDATA + 0x0080)
-  #define BDOSCODE    (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 + 0x0100)
-  #define BDOSENTRY   (BDOSCODE + 0x0010)
-  #define CCPCODE     (MEM - 0x0800 - 0x0380 - 0x0380 - 0x0E00 - 0x0800)
-*/
 
 #define BIOSCODE    (MEM - 0x0200)        // 0xFE00
 #define BIOSENTRY   (BIOSCODE + 0x0040)   // 0xFE40
 #define BIOSDATA    (BIOSCODE + 0x0100)   // 0xFF00
-#define BIOSDPH     (BIOSDATA + 0x0030)   // 0xFF80
-#define BIOSDPB     (BIOSDATA + 0x0040)   // 0xFF80
+#define BIOSDPH     (BIOSDATA + 0x0030)   // 0xFF30
+#define BIOSDPB     (BIOSDATA + 0x0040)   // 0xFF40
 #define BDOSCODE    (MEM - 0x0400)        // 0xFC00
-#define DIRBUF      (BDOSCODE + 0x0100)   // 0xFD00
 #define BDOSENTRY   (BDOSCODE + 0x0010)   // 0xFC10
+#define DIRBUF      (BDOSCODE + 0x0100)   // 0xFD00
 #define CCPCODE     (MEM - 0x0C00)        // 0xF400
 
 // Position of the $$$.SUB FCB on this CCP
@@ -54,11 +43,11 @@
 #define CBASE       (CCPCODE)       // Used for sanity checks
 #define FBASE       (BDOSCODE + 6)  // Used for sanity checks
 
-// Areas in zero page
-#define IOBYTE      (0x03)   // i/o definition byte.
-#define TDRIVE      (0x04)   // current drive name and user number.
-#define ENTRY       (0x05)   // entry point for the cp/m bdos.
-#define TBUFF       (0x80)   // i/o buffer and command line storage.
+// Areas in page zero
+#define IOBYTE      (0x03)   // I/O definition byte
+#define TDRIVE      (0x04)   // Current drive name and user number
+#define ENTRY       (0x05)   // Entry point for the CP/Mm BDOS
+#define TBUFF       (0x80)   // I/O buffer and command line storage
 
 // BIOS jump vectors
 #define BOOT        (BIOSCODE + 0x00)
@@ -79,17 +68,17 @@
 #define LISTST      (BIOSCODE + 0x2D)
 #define SECTRN      (BIOSCODE + 0x30)
 
-/* CP/M disk definitions */
-#define sizBK 128               // CP/M block size (bytes)
-#define recEX 128               // Number of records in extent
-#define sizEX (sizBK * recEX)   // Extent size (bytes)
-#define blkS2 4096              // Number of blocks in S2
-#define maxEX 31                // Maximum value the EX field can take
-#define maxS2 15                // Maximum value the S2 field can take
-#define maxCR 128               // Maximum value the CR field can take
-#define maxRC 128               // Maximum value the RC field can take
+/* CP/M FCB definitions */
+#define mskCR (0x7F)                // CR mask
+#define mskEX (0x1F)                // EX mask
+#define mskS2 (0x0F)                // S2 mask
+#define recEX (0x80)                // Number of records in extent
+#define recS2 ((mskEX + 1) * recEX) // Number of records in S2
+#define sizBK (0x80)                // CP/M block size (bytes)
+#define sizEX (sizBK * recEX)       // Extent size (bytes)
+#define maxRC 128                   // Maximum value the RC field can take
 
-// File name combined char string
+/* File name combined char string */
 #define FNDRIVE   0
 #define FNUSER    1
 #define FNFILE    2
@@ -97,6 +86,7 @@
 #define FNZERO    13
 #define FNHOST    16
 
+/* HEX conversion macros */
 #define toHEX(x)    ((x) < 10 ? (x) + 48 : (x) + 87)
 #define frHEX(x)    (((x) >= '0' && (x) <= '9') ? ((x) - '0') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : 0)))
 

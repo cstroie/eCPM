@@ -85,10 +85,12 @@ class BDOS {
     DRIVE     *drv;
     BIOS      *bios;
 
+    uint8_t   fnCall;             // BDOS function number
+
     void      bdosError(uint8_t err);
     void      readFCB();
     void      writeFCB();
-    void      showFCB(char* comment = "");
+    void      showFCB(const char* comment = "");
     void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
 

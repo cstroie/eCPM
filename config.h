@@ -20,11 +20,16 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+
 // Debug mode
 //#define DEBUG 1
+//#define DEBUG_BDOS_CALLS
+//#define DEBUG_FCB_READ
+//#define DEBUG_FCB_WRITE
+//#define DEBUG_DIRENTRY
 
-// EEPROM debug mode
-//#define DEBUG_EE
+// File system block size
+#define BLS_2048
 
 // Serial port speed
 #define SERIAL_SPEED  (115200)

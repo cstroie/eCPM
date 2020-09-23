@@ -42,6 +42,7 @@ class RAM {
     void      clear();
     void      reset();
     void      flush();
+    void      flush(uint16_t addr);
     uint8_t   getByte(uint16_t addr);
     void      setByte(uint16_t addr, uint8_t data);
     uint16_t  getWord(uint16_t addr);
@@ -50,14 +51,15 @@ class RAM {
     void      writeByte(uint16_t addr, uint8_t data);
     uint16_t  readWord(uint16_t addr);
     void      writeWord(uint16_t addr, uint16_t data);
-    void      read(uint16_t addr, uint8_t *buf, uint16_t len);
-    void      write(uint16_t addr, uint8_t *buf, uint16_t len);
+    void      read(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush = true);
+    void      write(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush = true);
     void      hexdump(uint16_t start = 0x0000, uint16_t stop = LASTBYTE, char* comment = "");
 
   private:
     // SPI transactions
     void begin();
     void end();
+    bool inBuffer(uint16_t addr);
 
     // Chip select
     int cs;

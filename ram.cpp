@@ -76,13 +76,17 @@ void RAM::reset() {
   end();
 }
 
+// Check if the address is contained in buffer
+bool RAM::inBuffer(uint16_t addr) {
+  return (addr > bufStart and addr < bufEnd);
+}
+
 // Flush the buffer, if dirty, and reset it
 void RAM::flush() {
-
   // Check if dirty
   if (bufDirty)
     // Write back the buffer into RAM
-    write(bufStart, buf, bufSize + 1);
+    write(bufStart, buf, bufSize + 1, false);
   // Make it clean
   bufDirty = false;
   // Reset the start and end addresses
@@ -90,14 +94,22 @@ void RAM::flush() {
   bufEnd = LASTBYTE;
 }
 
+// Flush the buffer, if dirty and the address is contained, and reset it
+void RAM::flush(uint16_t addr) {
+  // Check if the address is contained in buffer
+  if (inBuffer(addr))
+    // Need to flush
+    flush();
+}
+
 void RAM::bufChange(uint16_t addr) {
   // Check if the address is contained in buffer
-  if (addr > bufStart and addr < bufEnd)
+  if (inBuffer(addr))
     return;
   // Check if dirty
   if (bufDirty)
     // Write back the buffer into RAM
-    write(bufStart, buf, bufSize + 1);
+    write(bufStart, buf, bufSize + 1, false);
   // Set new start address
   if      (addr < bufHalfSize)
     bufStart = 0x0000;
@@ -108,14 +120,14 @@ void RAM::bufChange(uint16_t addr) {
   // End address
   bufEnd = bufStart + bufSize;
   // Fetch the buffer from RAM
-  read(bufStart, buf, bufSize + 1);
+  read(bufStart, buf, bufSize + 1, false);
   // Make it clean
   bufDirty = false;
 }
 
 uint8_t RAM::getByte(uint16_t addr) {
   // Check if the address is included in buffer
-  if (not(addr > bufStart and addr < bufEnd))
+  if (not(inBuffer(addr)))
     // Change the buffer
     bufChange(addr);
   // Directly return the byte from the buffer
@@ -124,7 +136,7 @@ uint8_t RAM::getByte(uint16_t addr) {
 
 void RAM::setByte(uint16_t addr, uint8_t data) {
   // Check if the address is included in buffer
-  if (not(addr > bufStart and addr < bufEnd))
+  if (not(inBuffer(addr)))
     // Change the buffer
     bufChange(addr);
   // Directly set the byte into the buffer
@@ -134,7 +146,7 @@ void RAM::setByte(uint16_t addr, uint8_t data) {
 
 uint16_t RAM::getWord(uint16_t addr) {
   // Check if the address is included in buffer
-  if (not(addr > bufStart and addr < bufEnd))
+  if (not(inBuffer(addr)))
     // Change the buffer
     bufChange(addr);
   // Directly return the byte from the buffer
@@ -143,7 +155,7 @@ uint16_t RAM::getWord(uint16_t addr) {
 
 void RAM::setWord(uint16_t addr, uint16_t data) {
   // Check if the address is included in buffer
-  if (not(addr > bufStart and addr < bufEnd ))
+  if (not(inBuffer(addr)))
     // Change the buffer
     bufChange(addr);
   // Directly set the byte into the buffer
@@ -216,8 +228,11 @@ void RAM::writeWord(uint16_t addr, uint16_t data) {
   end();
 }
 
-void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
+void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush) {
   uint16_t i = 0;
+  // Check first if we need to flush the buffers
+  if (doFlush)
+    flush(addr);
   // Begin SPI transfer
   begin();
   // Command
@@ -233,8 +248,11 @@ void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
   end();
 }
 
-void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
+void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush) {
   uint16_t i = 0;
+  // Check first if we need to flush the buffers
+  if (doFlush)
+    flush(addr);
   // Begin SPI transfer
   begin();
   // Command

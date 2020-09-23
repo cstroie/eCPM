@@ -35,7 +35,7 @@
 #define CCPCODE     (MEM - 0x0C00)        // 0xF400
 
 // Position of the $$$.SUB FCB on this CCP
-#define BatchFCB    (CCPCODE + 0x07AC)
+#define BATCHFCB    (CCPCODE + 0x07AC)
 
 
 

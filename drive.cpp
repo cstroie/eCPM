@@ -297,7 +297,7 @@ bool DRIVE::truncate(char* fname, uint8_t rec) {
 bool DRIVE::match(char *cname, char* pattern) {
   bool result = true;
   for (uint8_t i = 0; i < 11; i++)
-    if (*pattern == '?' || *pattern == *cname) {
+    if ((*pattern == *cname) or (*pattern == '?')) {
       cname++;
       pattern++;
       continue;

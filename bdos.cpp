@@ -322,6 +322,8 @@ void BDOS::call(uint16_t port) {
             if (ramFCB == BATCHFCB)
               // Truncate it to fcb.rc CP/M records so SUBMIT.COM can work
               drv->truncate(fName, fcb.rc);
+            // Close the file
+            drv->close(fName);
             result = 0x00;
           }
           else

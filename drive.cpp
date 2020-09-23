@@ -37,7 +37,7 @@ bool DRIVE::selDrive(uint8_t drive) {
   char disk[] = "A";
   // Adjust the drive letter
   disk[0] += drive;
-  // Check for directory existence
+  // Check if the drive directory exists
   ledOn();
   if (file = SD.open(disk, FILE_READ)) {
     result = file.isDirectory();
@@ -47,26 +47,89 @@ bool DRIVE::selDrive(uint8_t drive) {
   return result;
 }
 
-bool DRIVE::open(char* fname) {
+
+bool DRIVE::check(char* fname, uint8_t mode) {
+  bool result = false;
+  // Check if the file is already open
+  if (file) {
+    // Check if the open file is the same
+    if (strcmp(fname, file.name()) == 0) {
+      // Check if the mode is enough
+      if (lstMode == FILE_WRITE or lstMode == mode)
+        // The file is the same
+        result = true;
+      else {
+        // The file is the same, the mode needs to be changed
+        // Keep the last position
+        uint32_t lstPos = file.position();
+        // Close the file
+        file.close();
+        // Open the file again in the specified mode
+        if (file = SD.open(fname, mode)) {
+          // Seek to the old position
+          if (file.seek(lstPos)) {
+            // Keep the mode
+            lstMode = mode;
+            result = true;
+          }
+          else
+            // Seek error, close the file
+            file.close();
+        }
+      }
+    }
+    else {
+      // The file is not the same
+      // Close the old file
+      file.close();
+      // Open the new file in the specified mode
+      if (file = SD.open(fname, mode)) {
+        // Keep the last open mode
+        lstMode = mode;
+        result = true;
+      }
+    }
+  }
+  else {
+    // The file is not open, open it
+    if (file = SD.open(fname, mode)) {
+      // Keep the last mode
+      lstMode = mode;
+      result = true;
+    }
+  }
+  return result;
+}
+
+
+bool DRIVE::open(char* fname, uint8_t mode) {
   bool result = false;
   // Open the file
   ledOn();
-  if (file = SD.open(fname, FILE_READ)) {
-    file.close();
+  // Check the file is open
+  if (check(fname, mode))
     result = true;
-  }
   ledOff();
   return result;
 }
 
-uint32_t DRIVE::fileSize(char* fname) {
+void DRIVE::close(char* fname) {
+  ledOn();
+  // Check the file is open
+  if (check(fname))
+    // Close it
+    file.close();
+  ledOff();
+}
+
+uint32_t DRIVE::fileSize(char* fname, uint8_t mode) {
   uint32_t len = -1;
   // Open the file and get the size
   ledOn();
-  if (file = SD.open(fname, FILE_READ)) {
+  // Check the file is open
+  if (check(fname, mode))
+    // Get the size
     len = file.size();
-    file.close();
-  }
   ledOff();
   return len;
 }
@@ -118,7 +181,7 @@ uint8_t DRIVE::findNext(char *fname, uint32_t &fsize) {
   uint8_t result = 0xFF;
   ledOn();
   // Find the next file, skipping over directories
-  while (file = fDir.openNextFile()) {
+  while (File file = fDir.openNextFile()) {
     // Store the path and file name in fName, starting at FNHOST
     strcpy(fname + FNHOST, fPath);
     strcat(fname + FNHOST, file.name());
@@ -162,10 +225,18 @@ uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[sizBK];
   ledOn();
-  // Open the file
-  if (file = SD.open(fname, FILE_READ)) {
-    // Seek
-    if (file.seek(fpos)) {
+  // Check the file is open
+  if (check(fname)) {
+    // Seek success flag
+    bool skok = false;
+    // Check if we need to seek
+    if (file.position() == fpos)
+      // No need to seek, already on position
+      skok = true;
+    else
+      // Seek
+      skok = file.seek(fpos);
+    if (skok) {
       // Clear the buffer (^Z)
       memset(buf, 0x1A, sizBK);
       // Read from file
@@ -194,8 +265,6 @@ uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
           result = 0x04;
       }
     }
-    // Close the file
-    file.close();
   } else
     // Open error
     result = 0x10;
@@ -207,38 +276,49 @@ uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[sizBK];
   ledOn();
-  // Open the file for write
-  if (file = SD.open(fname, FILE_WRITE)) {
-    // Check if we need to seek beyond end
-    if (fpos > file.size()) {
-      // Seek to end
-      file.seek(file.size());
-      // Append
-      for (uint32_t i = 0; i < fpos - file.size(); i++)
-        if (file.write((uint8_t)0) != 1) {
-          // Disk full
-          result = 0x02;
-          break;
+  // Check the file is open in write mode
+  if (check(fname, FILE_WRITE)) {
+    // Seek success flag
+    bool skok = false;
+    // Check if we need to seek
+    if (file.position() == fpos)
+      // No need to seek, already on position
+      skok = true;
+    else {
+      // Check if we need to seek beyond its end
+      if (fpos > file.size()) {
+        // Yes, seek to end
+        if (file.seek(file.size())) {
+          // Append
+          for (uint32_t i = 0; i < fpos - file.size(); i++)
+            if (file.write((uint8_t)0x1A) != 1) {
+              // Disk full
+              result = 0x02;
+              break;
+            }
         }
-    }
-    // Check if the result is unchanged
-    if (result == 0xFF)
-      // Seek
-      if (file.seek(fpos)) {
-        // Read from RAM
-        ram->read(ramDMA, buf, sizBK);
-        // Write to file
-        if (file.write(&buf[0], sizBK))
-          result = 0x00;
         else
-          // Write error
-          result = 0x02;
-      } else
-        // Seek error
-        result = 0x06;
-    // Close the file
-    file.close();
-  } else
+          // Seek error
+          result = 0x06;
+      }
+      else {
+        // Seek inside written file
+        skok = file.seek(fpos);
+      }
+    }
+    // Check if the file seek was successfull
+    if (skok) {
+      // Read from RAM after flushing the buffers
+      ram->read(ramDMA, buf, sizBK);
+      // Write to file
+      if (file.write(&buf[0], sizBK))
+        result = 0x00;
+      else
+        // Write error
+        result = 0x02;
+    }
+  }
+  else
     // Open error
     result = 0x10;
   ledOff();
@@ -248,11 +328,9 @@ uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
 bool DRIVE::create(char* fname) {
   bool result = false;
   ledOn();
-  file = SD.open(fname, FILE_WRITE);
-  if (file) {
-    file.close();
+  // Check the file is open in write mode
+  if (check(fname, FILE_WRITE))
     result = true;
-  }
   ledOff();
   return result;
 }
@@ -268,8 +346,8 @@ bool DRIVE::remove(char* fname) {
 bool DRIVE::rename(char* fname, char* newname) {
   bool result = false;
   ledOn();
-  file = SD.open(fname, FILE_WRITE);
-  if (file) {
+  // Check the file is open in write mode
+  if (check(fname, FILE_WRITE)) {
     // FIXME
     //if (file.rename(newname)) {
     //  file.close();
@@ -283,12 +361,10 @@ bool DRIVE::rename(char* fname, char* newname) {
 bool DRIVE::truncate(char* fname, uint8_t rec) {
   bool result = false;
   ledOn();
-  if (file = SD.open(fname, FILE_WRITE)) {
-    if (file.truncate(rec * sizBK)) {
-      file.close();
+  // Check the file is open in write mode
+  if (check(fname, FILE_WRITE))
+    if (file.truncate(rec * sizBK))
       result = true;
-    }
-  }
   ledOff();
   return result;
 }

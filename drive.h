@@ -32,13 +32,15 @@ class DRIVE {
     DRIVE(RAM *ram);
     ~DRIVE();
     bool      selDrive(uint8_t drive);
-    uint32_t  fileSize(char* fname);
+    uint32_t  fileSize(char* fname, uint8_t mode = FILE_READ);
     uint8_t   findFirst(char* fname, uint32_t &fsize);
     uint8_t   findNext(char* fname, uint32_t &fsize);
     uint8_t   checkSUB(uint8_t drive, uint8_t user);
     uint8_t   read(uint16_t ramDMA, char* fname, uint32_t fpos);
     uint8_t   write(uint16_t ramDMA, char* fname, uint32_t fpos);
-    bool      open(char* fname);
+    bool      check(char* fname, uint8_t mode = FILE_READ);
+    bool      open(char* fname, uint8_t mode = FILE_READ);
+    void      close(char* fname);
     bool      create(char* fname);
     bool      remove(char* fname);
     bool      rename(char* fname, char* newname);
@@ -57,6 +59,7 @@ class DRIVE {
 
     File      file;
     File      fDir;               // The directory to look into
+    uint8_t   lstMode;            // Last file open mode
 };
 
 #endif /* DRIVE_H */

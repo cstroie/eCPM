@@ -243,23 +243,29 @@ void BDOS::call(uint16_t port) {
       logVector = 0x0001;   // Reset log in vector
       ramDMA = TBUFF;       // Setup default DMA address
       // Check if there is a $$$.SUB on the boot disk
-      cpu->regHL(drv->checkSUB());
+      cpu->regHL(drv->checkSUB(cDrive, cUser));
       break;
 
     case 0x0E:  // SETDSK
       // Function to set the active disk number.
       result = 0xFF;
-      // Save the current drive number
-      tDrive = cDrive;
-      // Change the drive
-      cDrive = cpu->regE();
-      // Check it
-      if (selDrive(cDrive + 1))
-        // Success
-        result = 0x00;
-      else
-        // Error, restore the current drive
-        cDrive = tDrive;
+      // Check if this is a drive change
+      if (cpu->regE() != cDrive) {
+        // Save the current drive number
+        tDrive = cDrive;
+        // Change the drive
+        cDrive = cpu->regE();
+        // Check it
+        if (selDrive(cDrive + 1)) {
+          // Set the drive log in vector
+          logVector = logVector | (1 << cDrive);
+          // Check if there is a $$$.SUB on the boot disk
+          result = drv->checkSUB(cDrive, cUser);
+        }
+        else
+          // Error, restore the current drive
+          cDrive = tDrive;
+      }
       // Return the result in HL
       cpu->regHL(result);
       break;
@@ -309,7 +315,6 @@ void BDOS::call(uint16_t port) {
             // Get the filename on SD card
             fcb2fname(fcb, fName);
             // Check if this is '$$$.SUB'
-            // FIXME
             if (strncmp((const char*)fcb.fn, "$$$     SUB", 11) == 0)
               // Truncate it to fcb.rc CP/M records so SUBMIT.COM can work
               drv->truncate(fName, fcb.rc);
@@ -837,6 +842,9 @@ void BDOS::readFCB() {
   ramFCB = cpu->regDE();
   // Create the FCB object
   ram->read(ramFCB, fcb.buf, 36);
+  // Uppercase file name and type
+  for (uint8_t i = 0; i < 11; i++)
+    *(fcb.fn + i) = toupper(*(fcb.fn + i) & 0x7F);
 #ifdef DEBUG_FCB_READ
   // Show FCB
   showFCB(BDOS_CALLS[fnCall]);
@@ -991,12 +999,8 @@ bool BDOS::selDrive(uint8_t drive) {
     // Use A=0, B=1, ...
     drive--;
   // Check if the drive exists (as directory on SD)
-  if (drv->selDrive(drive)) {
-    // Set the drive log in vector
-    logVector = logVector | (1 << drive);
-    result = true;
-  }
-  else
+  result = drv->selDrive(drive);
+  if (not result)
     // Return and display error
     bdosError(2);
   // Return the status

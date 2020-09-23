@@ -85,8 +85,13 @@ uint32_t DRIVE::fileSize(char* fname) {
 uint8_t DRIVE::findFirst(char* fname, uint32_t &fsize) {
   // TODO Custom base path
   char path[] = {fname[FNDRIVE], '/', fname[FNUSER], '/', 0};
-  // Keep the pattern
-  strncpy(fPattern, fname + FNFILE, 12);
+  // Keep the pattern (convert to uppercase)
+  for (uint8_t i = 0; i < 11; i++) {
+    char c = *(fname + FNFILE + i) & 0x7F;
+    fPattern[i] = toupper(c);
+  }
+  // Make sure it ends with zero
+  fPattern[11] = '\0';
   // Keep the path in fPath
   strncpy(fPath, path, 5);
   // Close the previously opened SD directory, if any
@@ -142,10 +147,14 @@ uint8_t DRIVE::findNext(char *fname, uint32_t &fsize) {
 }
 
 // Check if there is a "$$$.SUB" file on the A drive
-uint8_t DRIVE::checkSUB() {
+// FIXME Slow start, use directly 'open'
+uint8_t DRIVE::checkSUB(uint8_t drive, uint8_t user) {
   // Filename and file size (not used)
-  char      fName[128] = "A0$???????.SUB";
+  char      fName[128] = "A0$???????SUB";
   uint32_t  fSize;
+  // Update drive and user bytes
+  fName[FNDRIVE] = 'A' + drive;
+  fName[FNUSER]  = toHEX(user);
   return (findFirst(fName, fSize) == 0x00) ? 0xFF : 0x00;
 }
 
@@ -271,14 +280,15 @@ bool DRIVE::rename(char* fname, char* newname) {
   return result;
 }
 
-bool DRIVE::truncate(char* fname, uint8_t rc) {
+bool DRIVE::truncate(char* fname, uint8_t rec) {
   bool result = false;
   ledOn();
-  if (file = SD.open(fname, FILE_WRITE))
-    if (file.truncate(rc * sizBK)) {
+  if (file = SD.open(fname, FILE_WRITE)) {
+    if (file.truncate(rec * sizBK)) {
       file.close();
       result = true;
     }
+  }
   ledOff();
   return result;
 }
@@ -286,12 +296,13 @@ bool DRIVE::truncate(char* fname, uint8_t rc) {
 // Matches a FCB name to a search pattern
 bool DRIVE::match(char *cname, char* pattern) {
   bool result = true;
-  for (uint8_t i = 0; i < 12; i++)
+  for (uint8_t i = 0; i < 11; i++)
     if (*pattern == '?' || *pattern == *cname) {
       cname++;
       pattern++;
       continue;
-    } else {
+    }
+    else {
       result = false;
       break;
     }

@@ -19,27 +19,40 @@
 
 #include "drive.h"
 
-DRIVE::DRIVE(RAM *ram): ram(ram) {
+DRIVE::DRIVE(RAM *ram, char *bdir): ram(ram), bDir(bdir) {
 }
 
 DRIVE::~DRIVE() {
 }
 
+/*
+  Turn the drive led on
+*/
 void DRIVE::ledOn() {
   digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
 }
+
+/*
+  Turn the drive led off
+*/
 void DRIVE::ledOff() {
   digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
 }
 
+/*
+  Check the directory of the specified drive exists
+*/
 bool DRIVE::selDrive(uint8_t drive) {
   bool result = false;
-  char disk[] = "A";
+  char disk[] = "/A";
   // Adjust the drive letter
-  disk[0] += drive;
+  disk[1] += (drive & 0x0F);
+  // Build the path
+  strncpy(fPath, bDir, 16);
+  strncat(fPath, disk, 4);
   // Check if the drive directory exists
   ledOn();
-  if (file = SD.open(disk, FILE_READ)) {
+  if (file = SD.open(fPath, FILE_READ)) {
     result = file.isDirectory();
     file.close();
   }
@@ -47,9 +60,16 @@ bool DRIVE::selDrive(uint8_t drive) {
   return result;
 }
 
-
-bool DRIVE::check(char* fname, uint8_t mode) {
+/*
+  Check if the specified file is open in requested mode and,
+  if not, open it.  Restore the file position if needed.
+*/
+bool DRIVE::check(char* cname, uint8_t mode) {
   bool result = false;
+  char *fname;
+  // Build the path
+  fname = cname + FNHOST;
+  cname2fname(cname, fname);
   // Check if the file is already open
   if (file) {
     // Check if the open file is the same
@@ -101,90 +121,105 @@ bool DRIVE::check(char* fname, uint8_t mode) {
   return result;
 }
 
-
-bool DRIVE::open(char* fname, uint8_t mode) {
+/*
+  Open the file specified by the host file name
+*/
+bool DRIVE::open(char* cname, uint8_t mode) {
   bool result = false;
   // Open the file
   ledOn();
   // Check the file is open
-  if (check(fname, mode))
+  if (check(cname, mode))
     result = true;
   ledOff();
   return result;
 }
 
-void DRIVE::close(char* fname) {
+/*
+  Close the file specified by the host file name
+*/
+void DRIVE::close(char* cname) {
   ledOn();
   // Check the file is open
-  if (check(fname))
+  if (check(cname))
     // Close it
     file.close();
   ledOff();
 }
 
-uint32_t DRIVE::fileSize(char* fname, uint8_t mode) {
+/*
+  Return the size of the file specified by the host file name
+*/
+uint32_t DRIVE::fileSize(char* cname, uint8_t mode) {
   uint32_t len = -1;
   // Open the file and get the size
   ledOn();
   // Check the file is open
-  if (check(fname, mode))
+  if (check(cname, mode))
     // Get the size
     len = file.size();
   ledOff();
   return len;
 }
 
-// Find the first file specified by the pattern in fname:
-//   0    Drive letter              ("A")
-//   1    User hex code             ("0")
-//   2-12 File name in CP/M format  ("????????TXT")
-//  13    Zero
-// On success, fname will contain the following:
-//   0    Drive letter              ("A")
-//   1    User hex code             ("0")
-//   2-12 File name in CP/M format  ("SAMPLE  TXT")
-//  13-15 Zero
-//  16-.. Full file name on SD card
-uint8_t DRIVE::findFirst(char* fname, uint32_t &fsize) {
+/*
+  Find the first file specified by the pattern in cname:
+    0    Drive letter              ("A")
+    1    User hex code             ("0")
+    2-12 File name in CP/M format  ("????????TXT")
+   13    Zero
+  On success, cname will contain the following:
+    0    Drive letter              ("A")
+    1    User hex code             ("0")
+    2-12 File name in CP/M format  ("SAMPLE  TXT")
+   13-15 Zero
+   16-.. Full file name on SD card
+*/
+uint8_t DRIVE::findFirst(char* cname, uint32_t &fsize) {
   // TODO Custom base path
-  char path[] = {fname[FNDRIVE], '/', fname[FNUSER], '/', 0};
+  // Keep the drive letter and user hex code
+  fDrive = cname[FNDRIVE];
+  fUser = cname[FNUSER];
+  char path[] = {'/', cname[FNDRIVE], '/', cname[FNUSER], '/', 0};
   // Keep the pattern (convert to uppercase)
   for (uint8_t i = 0; i < 11; i++) {
-    char c = *(fname + FNFILE + i) & 0x7F;
+    char c = *(cname + FNFILE + i) & 0x7F;
     fPattern[i] = toupper(c);
   }
   // Make sure it ends with zero
   fPattern[11] = '\0';
   // Keep the path in fPath
-  strncpy(fPath, path, 5);
-  // Close the previously opened SD directory, if any
+  strncpy(fPath, bDir, 16);
+  strncat(fPath, path, 6);
+  // Close any previously opened SD directory
   if (fDir)
     fDir.close();
   // Open the SD directory (aka drive in CP/M)
-  fDir = SD.open(path);
-  // Check if the directory exists
-  if (fDir)
-    // Go find it
-    return findNext(fname, fsize);
-  else
-    // Error
-    return 0xFF;
+  if (fDir = SD.open(fPath))
+    // Check if the directory exists
+    if (fDir.isDirectory())
+      // Go find the first file
+      return findNext(cname, fsize);
+  // Error
+  return 0xFF;
 }
 
-// On success, fname will contain the following:
-//   0    Drive letter              ("A")
-//   1    User hex code             ("0")
-//   2-12 File name in CP/M format  ("SAMPLE  TXT")
-//  13-15 Zero
-//  16-.. Full file name on SD card
-uint8_t DRIVE::findNext(char *fname, uint32_t &fsize) {
+/*
+  On success, cname will contain the following:
+    0    Drive letter              ("A")
+    1    User hex code             ("0")
+    2-12 File name in CP/M format  ("SAMPLE  TXT")
+   13-15 Zero
+   16-.. Full file name on SD card
+*/
+uint8_t DRIVE::findNext(char *cname, uint32_t &fsize) {
   uint8_t result = 0xFF;
   ledOn();
   // Find the next file, skipping over directories
   while (File file = fDir.openNextFile()) {
     // Store the path and file name in fName, starting at FNHOST
-    strcpy(fname + FNHOST, fPath);
-    strcat(fname + FNHOST, file.name());
+    strcpy(cname + FNHOST, fDir.name());
+    strcat(cname + FNHOST, file.name());
     // Store the file size in fSize
     fsize = file.size();
     // Close the file
@@ -193,13 +228,9 @@ uint8_t DRIVE::findNext(char *fname, uint32_t &fsize) {
     if (file.isDirectory())
       continue;
     // Convert the file name to CP/M name and get user id
-    char cname[12];
-    uint8_t uid = fname2cname((char*)(fname + FNHOST), (char*)(fname + FNFILE));
+    uint8_t uid = fname2cname((char*)(cname + FNHOST), (char*)cname);
     // Match the pattern
-    if (match(fname + FNFILE, fPattern)) {
-      // Return the drive letter in FNDRIVE and hex user code in FNUSER positions
-      fname[FNDRIVE] = 'A'; // FIXME
-      fname[FNUSER] = toHEX(uid);
+    if (match(cname + FNFILE, fPattern)) {
       // Success
       result = 0x00;
       break;
@@ -221,12 +252,12 @@ uint8_t DRIVE::checkSUB(uint8_t drive, uint8_t user) {
   return (findFirst(fName, fSize) == 0x00) ? 0xFF : 0x00;
 }
 
-uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
+uint8_t DRIVE::read(uint16_t ramDMA, char* cname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[sizBK];
   ledOn();
   // Check the file is open
-  if (check(fname)) {
+  if (check(cname)) {
     // Seek success flag
     bool skok = false;
     // Check if we need to seek
@@ -272,12 +303,12 @@ uint8_t DRIVE::read(uint16_t ramDMA, char* fname, uint32_t fpos) {
   return result;
 }
 
-uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
+uint8_t DRIVE::write(uint16_t ramDMA, char* cname, uint32_t fpos) {
   uint8_t result = 0xFF;
   uint8_t buf[sizBK];
   ledOn();
   // Check the file is open in write mode
-  if (check(fname, FILE_WRITE)) {
+  if (check(cname, FILE_WRITE)) {
     // Seek success flag
     bool skok = false;
     // Check if we need to seek
@@ -325,29 +356,31 @@ uint8_t DRIVE::write(uint16_t ramDMA, char* fname, uint32_t fpos) {
   return result;
 }
 
-bool DRIVE::create(char* fname) {
+bool DRIVE::create(char* cname) {
   bool result = false;
   ledOn();
   // Check the file is open in write mode
-  if (check(fname, FILE_WRITE))
+  if (check(cname, FILE_WRITE))
     result = true;
   ledOff();
   return result;
 }
 
 // Remove a file from SD card.
-bool DRIVE::remove(char* fname) {
+// FIXME
+bool DRIVE::remove(char* cname) {
   ledOn();
-  SD.remove(fname);
+  SD.remove(cname + FNHOST); // FIXME
   ledOff();
   return true;
 }
 
-bool DRIVE::rename(char* fname, char* newname) {
+// FIXME
+bool DRIVE::rename(char* cname, char* newname) {
   bool result = false;
   ledOn();
   // Check the file is open in write mode
-  if (check(fname, FILE_WRITE)) {
+  if (check(cname, FILE_WRITE)) {
     // FIXME
     //if (file.rename(newname)) {
     //  file.close();
@@ -358,11 +391,11 @@ bool DRIVE::rename(char* fname, char* newname) {
   return result;
 }
 
-bool DRIVE::truncate(char* fname, uint8_t rec) {
+bool DRIVE::truncate(char* cname, uint8_t rec) {
   bool result = false;
   ledOn();
   // Check the file is open in write mode
-  if (check(fname, FILE_WRITE))
+  if (check(cname, FILE_WRITE))
     if (file.truncate(rec * sizBK))
       result = true;
   ledOff();
@@ -385,20 +418,27 @@ bool DRIVE::match(char *cname, char* pattern) {
   return result;
 }
 
-// Convert a host file name (A/0/AB.TXT) to CP/M name (AB      TXT)
+/*
+  Convert a host file name (A/0/FILE.TXT) to CP/M name (A0FILE    TXT)
+*/
 uint8_t DRIVE::fname2cname(char *fname, char *cname) {
   uint8_t i = 0;
-  uint8_t uid = 0;
+  char drv, usr;
   // Find the last occurence of '/'
   char *pch;
   pch = strrchr(fname, '/');
   // Check if found
   if (pch != NULL) {
     // Get the user id from path (just before '/')
-    uid = frHEX((char)(pch - 1)[0]);
+    usr = (char)(pch - 1)[0];
+    // Get the drive letter from path
+    drv = (char)(pch - 3)[0];
     // Advance fname beyond '/'
     fname = pch + 1;
   }
+  // Set the drive letter and user hex code
+  *(cname++) = drv;
+  *(cname++) = usr;
   // Convert file name to uppercase and copy to CP/M name
   i = 0;
   while (*fname != 0 && *fname != '.') {
@@ -427,5 +467,44 @@ uint8_t DRIVE::fname2cname(char *fname, char *cname) {
   // End with zero
   *cname = '\0';
   // Return the user id
-  return uid;
+  return frHEX(usr);
+}
+
+/*
+  Convert CP/M name (A0FILE    TXT) to a host file name (A/0/FILE.TXT)
+*/
+void DRIVE::cname2fname(char *cname, char *fname) {
+  char c;
+  // Start with the base directory
+  strncpy(fname, bDir, 16);
+  fname += strlen(bDir);
+  *(fname++) = '/';
+  // The drive letter
+  c = *(cname++);
+  *(fname++) = toupper(c);
+  // Path separator
+  *(fname++) = '/';
+  // User hex code
+  c = *(cname++);
+  *(fname++) = toupper(c);
+  // Path separator
+  *(fname++) = '/';
+  // File name
+  for (uint8_t i = 0; i < 8; i++) {
+    c = *(cname++) & 0x7F;
+    if (c > ' ')
+      *(fname++) = toupper(c);
+  }
+  // File type
+  for (uint8_t i = 0; i < 3; i++) {
+    c = *(cname++) & 0x7F;
+    if (c > ' ') {
+      // Only add the dot if there's an extension
+      if (i == 0)
+        *(fname++) = '.';
+      *(fname++) = toupper(c);
+    }
+  }
+  // End with zero
+  *(fname++) = '\0';
 }

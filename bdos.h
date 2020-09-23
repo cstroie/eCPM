@@ -78,6 +78,7 @@ class BDOS {
 
     bool    selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);
+    bool    fcb2cname(FCB_t fcb, char* fname);
 
   private:
     I8080     *cpu;

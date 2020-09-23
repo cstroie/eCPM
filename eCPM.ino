@@ -73,7 +73,7 @@ void I8080::iff(int on) {
 
 
 I8080 cpu;
-DRIVE drv(&ram);
+DRIVE drv(&ram, "ECPM");
 BIOS bios(&cpu, &ram);
 BDOS bdos(&cpu, &ram, &drv, &bios);
 

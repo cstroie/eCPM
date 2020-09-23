@@ -41,7 +41,7 @@ void callBDOS(int port);
 
 
 // Persistent configuration
-RAM ram(D0, 16);
+RAM ram(D0, RAM_CACHE_SIZE);
 
 int  I8080::read_word(int addr) {
   return ram.getWord(addr);

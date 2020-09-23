@@ -31,6 +31,9 @@
 // File system block size
 #define BLS_2048
 
+// RAM cache size (bytes)
+#define RAM_CACHE_SIZE  (32)
+
 // Serial port speed
 #define SERIAL_SPEED  (115200)
 

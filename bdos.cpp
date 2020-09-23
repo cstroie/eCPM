@@ -314,8 +314,12 @@ void BDOS::call(uint16_t port) {
           if (!(rwoVector & (1 << fcb.dr))) {
             // Get the filename on SD card
             fcb2fname(fcb, fName);
-            // Check if this is '$$$.SUB'
-            if (strncmp((const char*)fcb.fn, "$$$     SUB", 11) == 0)
+            // Check if this file is '$$$.SUB', whose FCB is at BatchFCB RAM address
+            // This file is written by SUBMIT.COM from the *.SUB file, from the last
+            // line to the first, one line per record.  CCP reads the last record
+            // (which contains the next line) then decrements the RC field and closes
+            // the file, efectivelly trimming the last record.
+            if (ramFCB == BatchFCB)
               // Truncate it to fcb.rc CP/M records so SUBMIT.COM can work
               drv->truncate(fName, fcb.rc);
             result = 0x00;

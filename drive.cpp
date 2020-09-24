@@ -141,9 +141,10 @@ bool DRIVE::open(char* cname, uint8_t mode) {
 void DRIVE::close(char* cname) {
   ledOn();
   // Check the file is open
-  if (check(cname))
-    // Close it
-    file.close();
+  if (file)
+    if (check(cname))
+      // Close it
+      file.close();
   ledOff();
 }
 
@@ -241,15 +242,13 @@ uint8_t DRIVE::findNext(char *cname, uint32_t &fsize) {
 }
 
 // Check if there is a "$$$.SUB" file on the A drive
-// FIXME Slow start, use directly 'open'
 uint8_t DRIVE::checkSUB(uint8_t drive, uint8_t user) {
-  // Filename and file size (not used)
-  char      fName[128] = "A0$???????SUB";
-  uint32_t  fSize;
-  // Update drive and user bytes
-  fName[FNDRIVE] = 'A' + drive;
-  fName[FNUSER]  = toHEX(user);
-  return (findFirst(fName, fSize) == 0x00) ? 0xFF : 0x00;
+  char fName[128] = "A0$$$     SUB";
+  fName[0] += drive;
+  fName[1] = toHEX(user);
+  uint8_t result = open(fName) ? 0xFF : 0x00;
+  close(fName);
+  return result;
 }
 
 uint8_t DRIVE::read(uint16_t ramDMA, char* cname, uint32_t fpos) {

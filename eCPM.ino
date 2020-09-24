@@ -36,8 +36,8 @@
 #include "bdos.h"
 
 // Some declarations
-void callBIOS(int port, int value);
-void callBDOS(int port);
+uint8_t callBDOS(int port);
+void    callBIOS(int port, int value);
 
 
 // SPI RAM
@@ -80,9 +80,8 @@ BDOS bdos(&cpu, &ram, &drv, &bios);
 void callBIOS(int port, int value) {
   bios.call(port);
 }
-
-void callBDOS(int port) {
-  bdos.call(port);
+uint8_t callBDOS(int port) {
+  return bdos.call(port);
 }
 
 /**

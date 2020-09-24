@@ -40,7 +40,7 @@ void callBIOS(int port, int value);
 void callBDOS(int port);
 
 
-// Persistent configuration
+// SPI RAM
 RAM ram(D0, RAM_CACHE_SIZE);
 
 int  I8080::read_word(int addr) {
@@ -60,8 +60,7 @@ void I8080::write_byte(int addr, int byte) {
 }
 
 int  I8080::io_input(int port) {
-  callBDOS(port);
-  return regA();
+  return callBDOS(port);
 }
 void I8080::io_output(int port, int value) {
   callBIOS(port, value);

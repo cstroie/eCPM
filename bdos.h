@@ -73,8 +73,8 @@ class BDOS {
   public:
     BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios);
     ~BDOS();
-    void init();
-    void call(uint16_t port);
+    void    init();
+    uint8_t call(uint16_t port);
 
     bool    selDrive(uint8_t drive);
     bool    fcb2fname(FCB_t fcb, char* fname);

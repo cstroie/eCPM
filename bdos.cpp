@@ -57,7 +57,7 @@ void BDOS::init() {
 #endif
 }
 
-void BDOS::call(uint16_t port) {
+uint8_t BDOS::call(uint16_t port) {
   uint16_t  w;
   uint8_t   b, count;
   char      c;
@@ -816,6 +816,9 @@ void BDOS::call(uint16_t port) {
   cpu->regA((uint8_t)cpu->regL());
   // C ends up equal to E
   cpu->regC((uint8_t)cpu->regE());
+
+  // Return
+  return cpu->regA();
 }
 
 

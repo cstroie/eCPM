@@ -212,7 +212,7 @@ void BIOS::call(uint16_t code) {
 void BIOS::boot() {
   signon();
   // Clear IOBYTE and TDRIVE
-  ram->setByte(IOBYTE, 0x00);  // 0x3D
+  ram->setByte(IOBYTE, 0x94);
   ram->setByte(TDRIVE, 0x00);
   // Go to CP/M
   gocpm();
@@ -220,8 +220,6 @@ void BIOS::boot() {
 
 // Back to CCP
 void BIOS::wboot() {
-  // TODO print warm boot message
-  Serial.print("\r\n64K CP/M v2.2\r\n");
   // Reload CCP
   loadCCP();
   // Go to CP/M
@@ -329,13 +327,11 @@ void BIOS::sectran() {
   cpu->regHL(cpu->regBC());  // HL=BC=No translation (1:1)
 }
 
-
 void BIOS::signon() {
-  Serial.print("\r\n64K CP/M v2.2 (eCPM 0.1)\r\n");
-  char buf[80];
-  sprintf_P(buf, PSTR("BIOS:%04X  BDTA:%04X  BDOS:%04X   CCP:%04X   DPB:%04X\r\n"),
-            BIOSCODE, BIOSDATA, BDOSCODE, CCPCODE, BIOSDPB);
-  Serial.print(buf);
+  char buf[80] = "\r\n64K CP/M v2.2 (eCPM 0.1)\r\n";
+  uint8_t i = 0;
+  while (buf[i])
+    conout(buf[i++]);
 }
 
 void BIOS::gocpm() {
@@ -353,7 +349,6 @@ void BIOS::gocpm() {
 
 // Load CCP at CCPCODE address
 void BIOS::loadCCP() {
-  //ram->write(CCPCODE, CCP_BIN, CCP_BIN_len);
   ram->write(CCPCODE, CCP_DR_64K, CCP_DR_64K_len);
 #ifdef DEBUG
   ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");

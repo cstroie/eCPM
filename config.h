@@ -32,7 +32,7 @@
 #define BLS_2048
 
 // RAM cache size (bytes)
-#define RAM_CACHE_SIZE  (32)
+#define RAM_CACHE_SIZE  (16)
 
 // Serial port speed
 #define SERIAL_SPEED  (115200)

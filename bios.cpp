@@ -107,7 +107,7 @@ void BIOS::init() {
 
 
 void BIOS::call(uint16_t code) {
-  //cpu->trace();
+  // TODO Debug BIOS calls
 
   switch (code) {
     case 0x00:  // BOOT
@@ -235,7 +235,7 @@ uint8_t BIOS::consts() {
 
 // Console character input to register A
 uint8_t BIOS::conin() {
-  while (!Serial.available()) { }
+  while (consts() == 0x00) { }
   result = Serial.read();
   cpu->regA(result);
   return result;
@@ -298,7 +298,6 @@ void BIOS::setsec() {
 // Set dma address given by register BC
 void BIOS::setdma() {
   cpu->regHL(cpu->regBC());
-  //dmaAddr = cpu->regBC();
 }
 
 // Read next disk record (disk/trk/sec/dma set)

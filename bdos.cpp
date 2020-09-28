@@ -132,12 +132,16 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x07:  // GETIOB
       // Function to return the i/o byte.
-      cpu->regHL(ram->getByte(IOBYTE));
+      b = ram->getByte(IOBYTE);
+      bios->ioByte(b);
+      cpu->regHL(b);
       break;
 
     case 0x08:  // SETIOB
       // Function to set the i/o byte.
-      ram->setByte(IOBYTE, cpu->regE());
+      b = cpu->regE();
+      bios->ioByte(b);
+      ram->setByte(IOBYTE, b);
       break;
 
     case 0x09:  // PRTSTR

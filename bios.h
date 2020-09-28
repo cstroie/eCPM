@@ -89,6 +89,8 @@ class BIOS {
     uint8_t listst();
     void    sectran();
 
+    void    ioByte(uint8_t iobyte);
+
     DPH_t   dph;
     DPB_t   dpb;
 
@@ -99,6 +101,11 @@ class BIOS {
     I8080   *cpu;
     RAM     *ram;
     uint8_t result;
+
+    uint8_t ioCON;
+    uint8_t ioRDR;
+    uint8_t ioPUN;
+    uint8_t ioLST;
 };
 
 #endif /* BIOS_H */

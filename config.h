@@ -23,6 +23,7 @@
 
 // Debug mode
 //#define DEBUG 1
+//#define DEBUG_BIOS_CALLS
 //#define DEBUG_BDOS_CALLS
 //#define DEBUG_FCB_READ
 //#define DEBUG_FCB_WRITE

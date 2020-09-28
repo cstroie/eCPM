@@ -20,6 +20,12 @@
 #include "bios.h"
 #include "ccp.h"
 
+// BIOS CALLS
+const char* BIOS_CALLS[] = {"BOOT", "WBOOT", "CONST", "CONIN", "CONOUT", "LIST",
+                            "PUNCH", "READER", "HOME", "SELDSK", "SETTRK", "SETSEC",
+                            "SETDMA", "READ", "WRITE", "LISTST", "SECTRN"
+                           };
+
 BIOS::BIOS(I8080 *cpu, RAM *ram): cpu(cpu), ram(ram) {
 }
 
@@ -107,7 +113,16 @@ void BIOS::init() {
 
 
 void BIOS::call(uint16_t code) {
-  // TODO Debug BIOS calls
+#ifdef DEBUG_BIOS_CALLS
+  Serial.print("\r\n\t\tBIOS call 0x");
+  Serial.print(code, HEX);
+  if (code <= 17) {
+    Serial.print("\t");
+    Serial.print(BIOS_CALLS[code]);
+  }
+  Serial.print("\r\n");
+  cpu->trace();
+#endif
 
   switch (code) {
     case 0x00:  // BOOT
@@ -196,7 +211,7 @@ void BIOS::call(uint16_t code) {
       break;
 
     default:
-#ifdef DEBUG
+#ifdef DEBUG_BIOS_CALLS
       // Show unimplemented BIOS calls only when debugging
       Serial.print("\r\nUnimplemented BIOS call: 0x");
       Serial.print(code, HEX);
@@ -352,4 +367,12 @@ void BIOS::loadCCP() {
 #ifdef DEBUG
   ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
 #endif
+}
+
+// Keep the device mappings
+void BIOS::ioByte(uint8_t iobyte) {
+  this->ioCON = iobyte & 0x03;
+  this->ioRDR = iobyte & 0x0C >> 2;
+  this->ioPUN = iobyte & 0x30 >> 4;
+  this->ioLST = iobyte & 0xC0 >> 6;
 }

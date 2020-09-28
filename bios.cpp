@@ -26,7 +26,7 @@ const char* BIOS_CALLS[] = {"BOOT", "WBOOT", "CONST", "CONIN", "CONOUT", "LIST",
                             "SETDMA", "READ", "WRITE", "LISTST", "SECTRN"
                            };
 
-BIOS::BIOS(I8080 *cpu, RAM *ram): cpu(cpu), ram(ram) {
+BIOS::BIOS(I8080 *cpu, RAM *ram, DRIVE *drv): cpu(cpu), ram(ram), drv(drv) {
 }
 
 BIOS::~BIOS() {
@@ -269,7 +269,8 @@ void BIOS::list() {
   list(cpu->regC());
 }
 void BIOS::list(uint8_t c) {
-  Serial.write((char)(c & 0x7F));
+  //Serial.write((char)(c & 0x7F));
+  drv->wrLST((char)(c & 0x7F));
 }
 
 // Punch device output character in C
@@ -349,6 +350,8 @@ void BIOS::signon() {
 }
 
 void BIOS::gocpm() {
+  // Close the LST dev file
+  drv->clLST();
   // Patch in a JP to WBOOT at location 0x0000
   ram->setByte(0x0000, 0xC3);   // JP WBOOT
   ram->setWord(0x0001, WBOOT);
@@ -363,7 +366,8 @@ void BIOS::gocpm() {
 
 // Load CCP at CCPCODE address
 void BIOS::loadCCP() {
-  ram->write(CCPCODE, CCP_DR_64K, CCP_DR_64K_len);
+  drv->loadCCP();
+  //ram->write(CCPCODE, CCP_DR_64K, CCP_DR_64K_len);
 #ifdef DEBUG
   ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
 #endif

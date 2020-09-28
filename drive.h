@@ -31,6 +31,8 @@ class DRIVE {
   public:
     DRIVE(RAM *ram, char *bdir = "");
     ~DRIVE();
+    void      init();
+    bool      loadCCP();
     bool      selDrive(uint8_t drive);
     uint32_t  fileSize(char* fname, uint8_t mode = FILE_READ);
     uint8_t   findFirst(char* fname, uint32_t &fsize);
@@ -45,6 +47,11 @@ class DRIVE {
     bool      remove(char* fname);
     bool      rename(char* fname, char* newname);
     bool      truncate(char* fname, uint8_t rec);
+
+    bool      ckLST();
+    void      wrLST(char c);
+    void      fsLST();
+    void      clLST();
 
   private:
     RAM       *ram;
@@ -65,6 +72,9 @@ class DRIVE {
     File      file;               // Current file in use
     File      fDir;               // The directory to look into
     uint8_t   lstMode;            // Last file open mode
+
+    File      devLST;             // The LIST device as file
+    uint32_t  tsLST;              // The LIST device timestamp
 };
 
 #endif /* DRIVE_H */

@@ -17,6 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <Ticker.h>
 #include <SPI.h>
 //#include <SdFat.h>
 
@@ -39,6 +40,8 @@
 uint8_t callBDOS(int port);
 void    callBIOS(int port, int value);
 
+// The ticker
+Ticker oneSec;
 
 // SPI RAM
 RAM ram(D0, RAM_BUFFER_SIZE);
@@ -72,8 +75,8 @@ void I8080::iff(int on) {
 
 
 I8080 cpu;
-DRIVE drv(&ram, "ECPM");
-BIOS bios(&cpu, &ram);
+DRIVE drv(&ram, "eCPM");
+BIOS bios(&cpu, &ram, &drv);
 BDOS bdos(&cpu, &ram, &drv, &bios);
 
 
@@ -82,6 +85,12 @@ void callBIOS(int port, int value) {
 }
 uint8_t callBDOS(int port) {
   return bdos.call(port);
+}
+
+// Handler for one second ticker
+void callTicker() {
+  // LST file flush
+  drv.fsLST();
 }
 
 /**
@@ -95,21 +104,21 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   // SPI
   SPI.begin();
-  // SD card
-  Serial.print("\r\neCPM: Initializing SD card... ");
-  if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
-    Serial.println(" failed!");
-    while (1);
-  }
-  Serial.println(" done.");
 
+  // Init the DRIVE
+  drv.init();
 
   // Init the SPI RAM
   // FIXME This breaks the SPI
   //ram.init();
 
+  // Init the BIOS
   bios.init();
+  // Init the BDOS
   bdos.init();
+
+  // Attach the handler to the one second ticker
+  oneSec.attach(1, callTicker);
 
   // Load some data
   //ram.write(0x0100, TST8080_COM, TST8080_COM_len);

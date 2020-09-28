@@ -26,6 +26,19 @@ DRIVE::~DRIVE() {
 }
 
 /*
+  Init the SD drive
+*/
+void DRIVE::init() {
+  // SD card
+  Serial.print("\r\neCPM: Initializing SD card... ");
+  if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
+    Serial.println(" failed!");
+    while (1);
+  }
+  Serial.println(" done.");
+}
+
+/*
   Turn the drive led on
 */
 void DRIVE::ledOn() {
@@ -37,6 +50,35 @@ void DRIVE::ledOn() {
 */
 void DRIVE::ledOff() {
   digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+}
+
+/*
+  Check the directory of the specified drive exists
+*/
+bool DRIVE::loadCCP() {
+  bool result = false;
+  uint8_t buf[128];
+  uint8_t len;
+  // Build the path
+  strncpy(fPath, bDir, 16);
+  strcat(fPath, CCP_FILE);
+  // Check if the file exists
+  ledOn();
+  if (file = SD.open(fPath, FILE_READ)) {
+    result = true;
+    uint16_t addr = CCPCODE;
+    while (len != -1) {
+      // Read from file
+      len = file.read(buf, 128);
+      // Write into memory
+      ram->write(addr, buf, len);
+      // Adjust address
+      addr += len;
+    }
+    file.close();
+  }
+  ledOff();
+  return result;
 }
 
 /*
@@ -399,6 +441,82 @@ bool DRIVE::truncate(char* cname, uint8_t rec) {
       result = true;
   ledOff();
   return result;
+}
+
+/*
+  Write the character c to the LST file
+*/
+void DRIVE::wrLST(char c) {
+  // Check if the file needs to be open
+  if (not devLST)
+    ckLST();
+  // Check is the file is open
+  if (devLST) {
+    ledOn();
+    // Write to file
+    devLST.write(c);
+    // Keep the timestamp
+    tsLST = millis();
+    ledOff();
+  }
+}
+
+/*
+  Open, if necessary, the LST file
+*/
+bool DRIVE::ckLST() {
+  bool result = false;
+  char cname[128] = "A0DEV-LST TXT";
+  char *fname;
+  // Build the path
+  fname = cname + FNHOST;
+  cname2fname(cname, fname);
+  // Try to open the file for write
+  if (not devLST) {
+    // Reset the timestamp if the file is not open
+    tsLST = 0UL;
+    ledOn();
+    // Try to open the file
+    if (devLST = SD.open(fname, FILE_WRITE)) {
+      // Set the timestamp
+      tsLST = millis();
+      result = true;
+    }
+    ledOff();
+  }
+  return result;
+}
+
+/*
+  Flush the LST file after a while
+*/
+void DRIVE::fsLST() {
+  // Check if the file is open
+  if (devLST)
+    // Check if the timestamp has been set
+    if (tsLST > 0)
+      // Check if timed out (10 seconds)
+      if (millis() - tsLST > 100000UL) {
+        ledOn();
+        // Flush the file
+        devLST.flush();
+        ledOff();
+      }
+}
+
+/*
+  Close the LST file
+*/
+void DRIVE::clLST() {
+  // Check if the file is open
+  if (devLST)
+    // Check if the timestamp has been set
+    if (tsLST > 0) {
+      ledOn();
+      // Close the file
+      devLST.close();
+      ledOff();
+    }
 }
 
 // Matches a FCB name to a search pattern

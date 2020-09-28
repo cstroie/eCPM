@@ -35,6 +35,9 @@
 // RAM cache size (bytes)
 #define RAM_BUFFER_SIZE  (8)
 
+// CCP file name
+#define CCP_FILE  ("CCP-DR.BIN")
+
 // Serial port speed
 #define SERIAL_SPEED  (115200)
 

@@ -25,6 +25,7 @@
 #include "config.h"
 #include "i8080.h"
 #include "ram.h"
+#include "drive.h"
 
 
 struct DPH_t {
@@ -63,7 +64,7 @@ struct DPB_t {
 
 class BIOS {
   public:
-    BIOS(I8080 *cpu, RAM *ram);
+    BIOS(I8080 *cpu, RAM *ram, DRIVE *drv);
     ~BIOS();
     void init();
     void call(uint16_t code);
@@ -95,11 +96,14 @@ class BIOS {
     DPB_t   dpb;
 
   private:
+    I8080   *cpu;
+    RAM     *ram;
+    DRIVE   *drv;
+
     void    signon();
     void    gocpm();
     void    loadCCP();
-    I8080   *cpu;
-    RAM     *ram;
+
     uint8_t result;
 
     uint8_t ioCON;

@@ -41,7 +41,7 @@ void    callBIOS(int port, int value);
 
 
 // SPI RAM
-RAM ram(D0, RAM_CACHE_SIZE);
+RAM ram(D0, RAM_BUFFER_SIZE);
 
 int  I8080::read_word(int addr) {
   return ram.getWord(addr);
@@ -96,7 +96,7 @@ void setup() {
   // SPI
   SPI.begin();
   // SD card
-  Serial.print("\r\nInitializing SD card... ");
+  Serial.print("\r\neCPM: Initializing SD card... ");
   if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
     Serial.println(" failed!");
     while (1);

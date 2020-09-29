@@ -111,6 +111,25 @@ bool DRIVE::loadCCP(bool verbose) {
 }
 
 /*
+  Create the user code directory
+*/
+void DRIVE::mkDir(uint8_t drive, uint8_t user) {
+  char disk[] = "/A/0";
+  // Adjust the drive letter
+  disk[1] += (drive & 0x0F);
+  // Adjust the user hex code
+  disk[3] = toHEX(user);
+  // Build the path
+  strncpy(fPath, bDir, 16);
+  strncat(fPath, disk, 4);
+  // Check if the drive directory exists
+  ledOn();
+  if (not SD.exists(fPath))
+    SD.mkdir(fPath);
+  ledOff();
+}
+
+/*
   Check the directory of the specified drive exists
 */
 bool DRIVE::selDrive(uint8_t drive) {
@@ -248,7 +267,6 @@ uint32_t DRIVE::fileSize(char* cname, uint8_t mode) {
    16-.. Full file name on SD card
 */
 uint8_t DRIVE::findFirst(char* cname, uint32_t &fsize) {
-  // TODO Custom base path
   // Keep the drive letter and user hex code
   fDrive = cname[FNDRIVE];
   fUser = cname[FNUSER];

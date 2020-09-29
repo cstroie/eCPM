@@ -33,6 +33,7 @@ class DRIVE {
     ~DRIVE();
     void      init();
     bool      loadCCP(bool verbose = false);
+    void      mkDir(uint8_t drive, uint8_t user);
     bool      selDrive(uint8_t drive);
     uint32_t  fileSize(char* fname, uint8_t mode = FILE_READ);
     uint8_t   findFirst(char* fname, uint32_t &fsize);

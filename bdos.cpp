@@ -61,15 +61,16 @@ void BDOS::init() {
 
 uint8_t BDOS::call(uint16_t port) {
   uint16_t  w;
-  uint8_t   b, count;
+  uint8_t   b, count, eparam;
   char      c;
 
   // Save the (DE) parameters
   params = cpu->regDE();
+  eparam = (uint8_t)(params & 0x00FF);
   // Get function number
   func = cpu->regC();
   // Keep single register function here
-  cpu->regC(cpu->regE());
+  cpu->regC(eparam);
   // HL is address of the function
   cpu->regHL(BDOSENTRY);
   // Clear return status
@@ -105,7 +106,7 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x02:  // OUTCON
       // Function to output (E) to the console device and expand tabs if necessary.
-      bios->conout(cpu->regE());
+      bios->conout(eparam);
       break;
 
     case 0x03:  // GETRDR
@@ -115,41 +116,37 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x04:  // PUNCH
       // Auxiliary (Punch) output
-      bios->punch(cpu->regE());
+      bios->punch(eparam);
       break;
 
     case 0x05:  // LIST
       // Printer output
-      bios->list(cpu->regE());
+      bios->list(eparam);
       break;
 
     case 0x06:  // DIRCIO
       // Function to perform direct console i/o. If (C) contains (FF)
       // then this is an input request. Otherwise we are to output (C).
-      if (cpu->regE() == 0xFF) {
+      if (eparam == 0xFF) {
         if (bios->consts() == 0xFF)
           result = bios->conin();
         else
           result = 0x0000;
       }
-      else {
-        // TODO outcon()
-        bios->conout(cpu->regE());
-      }
+      else
+        bios->conout(eparam);
       break;
 
     case 0x07:  // GETIOB
       // Function to return the i/o byte.
-      b = ram->getByte(IOBYTE);
-      bios->ioByte(b);
-      result = b;
+      result = ram->getByte(IOBYTE);
+      bios->ioByte(result & 0x00FF);
       break;
 
     case 0x08:  // SETIOB
       // Function to set the i/o byte.
-      b = cpu->regE();
-      bios->ioByte(b);
-      ram->setByte(IOBYTE, b);
+      bios->ioByte(eparam);
+      ram->setByte(IOBYTE, eparam);
       break;
 
     case 0x09:  // PRTSTR
@@ -262,11 +259,11 @@ uint8_t BDOS::call(uint16_t port) {
       // Function to set the active disk number.
       result = 0xFF;
       // Check if this is a drive change
-      if (cpu->regE() != cDrive) {
+      if (eparam != cDrive) {
         // Save the current drive number
         tDrive = cDrive;
         // Change the drive
-        cDrive = cpu->regE();
+        cDrive = eparam;
         // Check it
         if (selDrive(cDrive + 1)) {
           // Set the drive log in vector
@@ -629,11 +626,12 @@ uint8_t BDOS::call(uint16_t port) {
       // Function to get or set the user number. If (E) was (FF)
       // then this is a request to return the current user number.
       // Else set the user number from (E).
-      if (cpu->regE() == 0xFF)
+      if (eparam == 0xFF)
         result = cUser & 0x000F;
-      else
-        // TODO Make user dir
-        cUser = cpu->regE() & 0x0F;
+      else {
+        cUser = eparam & 0x0F;
+        drv->mkDir(cDrive, cUser);
+      }
       break;
 
     case 0x21:  // RDRANDOM
@@ -1002,61 +1000,6 @@ bool BDOS::selDrive(uint8_t drive) {
     bdosError(2);
   // Return the status
   return result;
-}
-
-// Convert FCB to host file name
-bool BDOS::fcb2fname(FCB_t fcb, char* fname) {
-  bool unique = true;
-  // TODO Use custom base paths
-  // Start with the drive letter
-  if (fcb.dr && fcb.dr != '?')
-    // The drive is specified and non ambiguous
-    *(fname++) = (fcb.dr - 1) + 'A';
-  else
-    // Use the current drive
-    *(fname++) = cDrive + 'A';
-  // Path separator
-  *(fname++) = '/';
-  // User number, converted to HEX
-  *(fname++) = toHEX(cUser);
-  // Path separator
-  *(fname++) = '/';
-  // Check if the file name is ambiguous or not
-  if (fcb.dr != '?') {
-    // File name
-    for (uint8_t i = 0; i < 8; i++) {
-      char c = fcb.fn[i] & 0x7F;
-      if (c > ' ')
-        *(fname++) = toupper(c);
-      if (c == '?')
-        unique = false;
-    }
-    // File type
-    for (uint8_t i = 0; i < 3; i++) {
-      char c = fcb.tp[i] & 0x7F;
-      if (c > ' ') {
-        // Only add the dot if there's an extension
-        if (i == 0)
-          *(fname++) = '.';
-        *(fname++) = toupper(c);
-      }
-      if (c == '?')
-        unique = false;
-    }
-  }
-  else {
-    // The file name is ambiguous, fill with '?'
-    for (uint8_t i = 0; i < 8; i++)
-      *(fname++) = '?';
-    *(fname++) = '.';
-    for (uint8_t i = 0; i < 3; i++)
-      *(fname++) = '?';
-    unique = false;
-  }
-  // End with zero
-  *(fname++) = '\0';
-  // Return if it is ambiguous or not
-  return unique;
 }
 
 // Convert FCB to CP/M file name (A0FILE    TXT)

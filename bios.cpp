@@ -297,7 +297,7 @@ void BIOS::home() {
 
 // Select disk given by register C
 void BIOS::seldsk() {
-  // FIXME A responsibility of the SELDSK subroutine
+  // A responsibility of the SELDSK subroutine
   // is to return the base address of the DPH for
   // the selected drive. The following sequence of
   // operations returns the table address, with a

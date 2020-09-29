@@ -102,16 +102,14 @@ void setup() {
   digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
   // Serial port configuration
   Serial.begin(SERIAL_SPEED);
+  Serial.print("\r\n\r\n");
   // SPI
   SPI.begin();
-
   // Init the DRIVE
   drv.init();
-
   // Init the SPI RAM
   // FIXME This breaks the SPI
   //ram.init();
-
   // Init the BIOS
   bios.init();
   // Init the BDOS
@@ -119,11 +117,6 @@ void setup() {
 
   // Attach the handler to the one second ticker
   oneSec.attach(1, callTicker);
-
-  // Load some data
-  //ram.write(0x0100, TST8080_COM, TST8080_COM_len);
-  //ram.write(0x0100, DEMO_COM, DEMO_COM_len);
-  //ram.write(0x0100, __8080EXM_COM, __8080EXM_COM_len);
 
   // RAM hex dump
   //ram.hexdump(0x0000, 0x0200);

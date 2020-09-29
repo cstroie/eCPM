@@ -38,6 +38,7 @@ BDOS::~BDOS() {
 }
 
 void BDOS::init() {
+  Serial.print("eCPM: Initializing BDOS...");
   // Serial number, 6 bytes
   uint8_t cpmSerialNo[] = {0, 22, 0, 0, 0, 0};
   ram->write(BDOSCODE, cpmSerialNo, sizeof(cpmSerialNo));
@@ -50,6 +51,7 @@ void BDOS::init() {
   ram->setByte(BDOSENTRY,     0xDB);      // IN A, (0x00)
   ram->setByte(BDOSENTRY + 1, 0x00);
   ram->setByte(BDOSENTRY + 2, 0xC9);      // RET
+  Serial.print(" done.\r\n");
 
 #ifdef DEBUG
   ram->hexdump(BDOSCODE,  BDOSCODE  + 0x10, "BDOS");
@@ -62,24 +64,30 @@ uint8_t BDOS::call(uint16_t port) {
   uint8_t   b, count;
   char      c;
 
-  fnCall = cpu->regC();
+  // Save the (DE) parameters
+  params = cpu->regDE();
+  // Get function number
+  func = cpu->regC();
+  // Keep single register function here
+  cpu->regC(cpu->regE());
+  // HL is address of the function
+  cpu->regHL(BDOSENTRY);
+  // Clear return status
+  result = 0x0000;
+
 #ifdef DEBUG_BDOS_CALLS
   Serial.print("\r\n\t\tBDOS call 0x");
-  Serial.print(fnCall, HEX);
-  if (fnCall <= 41) {
+  Serial.print(func, HEX);
+  if (func <= 41) {
     Serial.print("\t");
-    Serial.print(BDOS_CALLS[fnCall]);
+    Serial.print(BDOS_CALLS[func]);
   }
   Serial.print("\r\n");
   cpu->trace();
 #endif
 
-  // HL is reset by the BDOS
-  cpu->regHL(0x0000);
-  cpu->regC(cpu->regE());
-
   // Dispatch call
-  switch (fnCall) {
+  switch (func) {
     case 0x00:  // WBOOT
       // System reset
       bios->wboot();
@@ -88,7 +96,7 @@ uint8_t BDOS::call(uint16_t port) {
     case 0x01:  // GETCON
       // Function to get a character from the console device.
       c = bios->conin();
-      cpu->regHL(c);
+      result = c;
       if (c == 0x0A or c == 0x0D or c == 0x09 or c == 0x08 or c >= ' ')
         cpu->regE(c);
       else
@@ -102,7 +110,7 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x03:  // GETRDR
       // Function to get a character from the tape reader device.
-      cpu->regHL(bios->reader());
+      result = bios->reader();
       break;
 
     case 0x04:  // PUNCH
@@ -120,9 +128,9 @@ uint8_t BDOS::call(uint16_t port) {
       // then this is an input request. Otherwise we are to output (C).
       if (cpu->regE() == 0xFF) {
         if (bios->consts() == 0xFF)
-          cpu->regHL(bios->conin());
+          result = bios->conin();
         else
-          cpu->regHL(0x00);
+          result = 0x0000;
       }
       else {
         // TODO outcon()
@@ -134,7 +142,7 @@ uint8_t BDOS::call(uint16_t port) {
       // Function to return the i/o byte.
       b = ram->getByte(IOBYTE);
       bios->ioByte(b);
-      cpu->regHL(b);
+      result = b;
       break;
 
     case 0x08:  // SETIOB
@@ -230,14 +238,14 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x0B:  // GETCSTS
       // Function to interigate the console device.
-      cpu->regHL(bios->consts());
+      result = bios->consts();
       break;
 
     case 0x0C:  // GETVER
       // Function to return the current cp/m version number.
       // A=L=0x22 => 2.2
       // B=H=0x00 => 8080, CP/M
-      cpu->regHL(0x0022);
+      result = 0x0022;
       break;
 
     case 0x0D:  // RSTDSK
@@ -247,7 +255,7 @@ uint8_t BDOS::call(uint16_t port) {
       logVector = 0x0001;   // Reset log in vector
       ramDMA = TBUFF;       // Setup default DMA address
       // Check if there is a $$$.SUB on the boot disk
-      cpu->regHL(drv->checkSUB(cDrive, cUser));
+      result = drv->checkSUB(cDrive, cUser);
       break;
 
     case 0x0E:  // SETDSK
@@ -270,8 +278,6 @@ uint8_t BDOS::call(uint16_t port) {
           // Error, restore the current drive
           cDrive = tDrive;
       }
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x0F:  // OPENFIL
@@ -301,8 +307,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x10:  // CLOSEFIL
@@ -340,8 +344,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x11:  // GETFST
@@ -383,8 +385,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x12:  // GETNXT
@@ -416,8 +416,6 @@ uint8_t BDOS::call(uint16_t port) {
             dirEntry(fName + FNFILE, frHEX(fName[1]), fSize);
           }
         }
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x13:  // DELFILE
@@ -455,8 +453,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x14:  // READSEQ
@@ -486,8 +482,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x15:  // WRTSEQ
@@ -523,8 +517,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x16:  // FCREATE
@@ -558,8 +550,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x17:  // RENFILE
@@ -592,18 +582,16 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x18:  // GETLOG
       // Function to return the login vector.
-      cpu->regHL(logVector);
+      result = logVector;
       break;
 
     case 0x19:  // GETCRNT
       // Function to return the current disk assignment.
-      cpu->regHL(cDrive);
+      result = cDrive;
       break;
 
     case 0x1A:  // PUTDMA
@@ -615,7 +603,7 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x1B:  // GETALOC
       // Function to return the allocation vector.
-      cpu->regHL(alcVector);
+      result = alcVector;
       break;
 
     case 0x1C:  // WRTPRTD
@@ -625,7 +613,7 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x1D:  // GETROV
       // Function to return the read-only status vector.
-      cpu->regHL(rwoVector);
+      result = rwoVector;
       break;
 
     case 0x1E:  // SETATTR
@@ -634,7 +622,7 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x1F:  // GETPARM
       // Function to return the address of the disk parameter block for the current drive.
-      cpu->regHL(BIOSDPB);
+      result = BIOSDPB;
       break;
 
     case 0x20:  // GETUSER
@@ -642,7 +630,7 @@ uint8_t BDOS::call(uint16_t port) {
       // then this is a request to return the current user number.
       // Else set the user number from (E).
       if (cpu->regE() == 0xFF)
-        cpu->regHL(cUser & 0x000F);
+        result = cUser & 0x000F;
       else
         // TODO Make user dir
         cUser = cpu->regE() & 0x0F;
@@ -672,8 +660,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x22:  // WTRANDOM
@@ -706,8 +692,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x23:  // FILESIZE
@@ -731,8 +715,6 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x24:  // SETRAN
@@ -751,8 +733,6 @@ uint8_t BDOS::call(uint16_t port) {
       fcb.r2 = (fRec >> 16) & 0xFF;
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     case 0x25:  // LOGOFF
@@ -761,12 +741,12 @@ uint8_t BDOS::call(uint16_t port) {
 
     case 0x26:  // DRVACCESS
       // Locks one or more disc drives (not implemented MP/M only).
-      cpu->regHL(0x0000);
+      result = 0x0000;
       break;
 
     case 0x27:  // DRVFREE
       // Releases locks on disc drives (not implemented MP/M only).
-      cpu->regHL(0x0000);
+      result = 0x0000;
       break;
 
     case 0x28:  // WTSPECL
@@ -800,26 +780,24 @@ uint8_t BDOS::call(uint16_t port) {
       }
       // Write the FCB back into RAM
       writeFCB();
-      // Return the result in HL
-      cpu->regHL(result);
       break;
 
     default:
 #ifdef DEBUG_BDOS_CALLS
       // Show unimplemented BDOS calls only when debugging
       Serial.print("\r\nUnimplemented BDOS call 0x");
-      Serial.print(fnCall, HEX);
+      Serial.print(func, HEX);
       Serial.print("\r\n");
       cpu->trace();
 #endif
       break;
   }
 
-  // CP/M BDOS does this before returning
+  // Get return status
+  cpu->regHL(result);
+  // Force version 1.4 compatibility
   cpu->regB((uint8_t)cpu->regH());
   cpu->regA((uint8_t)cpu->regL());
-  // C ends up equal to E
-  cpu->regC((uint8_t)cpu->regE());
 
   // Return
   return cpu->regA();
@@ -866,7 +844,7 @@ void BDOS::readFCB() {
     *(fcb.fn + i) = toupper(*(fcb.fn + i) & 0x7F);
 #ifdef DEBUG_FCB_READ
   // Show FCB
-  showFCB(BDOS_CALLS[fnCall]);
+  showFCB(BDOS_CALLS[func]);
 #endif
 }
 
@@ -877,7 +855,7 @@ void BDOS::writeFCB() {
   ram->write(ramFCB, fcb.buf, 36);
 #ifdef DEBUG_FCB_WRITE
   // Show FCB
-  showFCB(BDOS_CALLS[fnCall]);
+  showFCB(BDOS_CALLS[func]);
 #endif
 }
 

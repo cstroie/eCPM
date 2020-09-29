@@ -86,7 +86,6 @@ class BDOS {
     DRIVE     *drv;
     BIOS      *bios;
 
-    uint8_t   fnCall;             // BDOS function number
 
     void      bdosError(uint8_t err);
     void      readFCB();
@@ -94,6 +93,8 @@ class BDOS {
     void      showFCB(const char* comment = "");
     void      dirEntry(char *cname, uint8_t uid, uint32_t fsize);
 
+    uint8_t   func;               // BDOS function number
+    uint16_t  params;             // Keep DE before BDOS call
 
     uint8_t   cDrive = 0;         // Current drive
     uint8_t   tDrive = 0;         // Temporary drive

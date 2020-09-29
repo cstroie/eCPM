@@ -102,7 +102,6 @@ class BIOS {
 
     void    signon();
     void    gocpm();
-    void    loadCCP();
 
     uint8_t result;
 

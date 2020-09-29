@@ -29,13 +29,18 @@ DRIVE::~DRIVE() {
   Init the SD drive
 */
 void DRIVE::init() {
-  // SD card
-  Serial.print("\r\neCPM: Initializing SD card... ");
+  Serial.print("eCPM: Initializing SD card...");
   if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
     Serial.println(" failed!");
-    while (1);
+    while (true) {
+#if defined(ESP8266)
+      // ESP 8266
+      yield();
+#endif
+    }
   }
-  Serial.println(" done.");
+  else
+    Serial.println(" done.");
 }
 
 /*
@@ -55,21 +60,29 @@ void DRIVE::ledOff() {
 /*
   Check the directory of the specified drive exists
 */
-bool DRIVE::loadCCP() {
+bool DRIVE::loadCCP(bool verbose) {
   bool result = false;
   uint8_t buf[128];
-  uint8_t len;
+  uint8_t len = 0xFF;
   // Build the path
   strncpy(fPath, bDir, 16);
+  strcat(fPath, "/");
   strcat(fPath, CCP_FILE);
+  if (verbose) {
+    // Message
+    Serial.print("eCPM: Loading ");
+    Serial.print(fPath);
+    Serial.print("...");
+  }
   // Check if the file exists
-  ledOn();
   if (file = SD.open(fPath, FILE_READ)) {
     result = true;
     uint16_t addr = CCPCODE;
-    while (len != -1) {
+    while (len > 0) {
       // Read from file
+      ledOn();
       len = file.read(buf, 128);
+      ledOff();
       // Write into memory
       ram->write(addr, buf, len);
       // Adjust address
@@ -77,7 +90,23 @@ bool DRIVE::loadCCP() {
     }
     file.close();
   }
-  ledOff();
+  if (not result) {
+    if (verbose)
+      Serial.println(" failed!");
+    while (true) {
+#if defined(ESP8266)
+      // ESP 8266
+      yield();
+#endif
+    }
+  }
+  else if (verbose)
+    Serial.println(" done.");
+
+#ifdef DEBUG
+  ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
+#endif
+
   return result;
 }
 

@@ -34,6 +34,8 @@ BIOS::~BIOS() {
 
 void BIOS::init() {
   uint16_t j;
+
+  Serial.print("eCPM: Initializing BIOS...");
   // Patch in the BIOS jump vectors (17 functions)
   for (uint8_t i = 0; i < 17; i++) {
     // Compute an offset
@@ -101,9 +103,10 @@ void BIOS::init() {
   ram->setWord(addr++, dpb.cks); addr++;
   ram->setWord(addr++, dpb.off);
   ram->flush();
+  Serial.print(" done.\r\n");
 
   // Load CCP
-  loadCCP();
+  drv->loadCCP(true);
 
 #ifdef DEBUG
   ram->hexdump(BIOSCODE,  BIOSCODE  + j, "BIOS");
@@ -236,7 +239,7 @@ void BIOS::boot() {
 // Back to CCP
 void BIOS::wboot() {
   // Reload CCP
-  loadCCP();
+  drv->loadCCP();
   // Go to CP/M
   gocpm();
 }
@@ -362,15 +365,6 @@ void BIOS::gocpm() {
   cpu->regC(ram->getByte(TDRIVE));
   // Jump to CCP
   cpu->jump(CCPCODE);
-}
-
-// Load CCP at CCPCODE address
-void BIOS::loadCCP() {
-  drv->loadCCP();
-  //ram->write(CCPCODE, CCP_DR_64K, CCP_DR_64K_len);
-#ifdef DEBUG
-  ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");
-#endif
 }
 
 // Keep the device mappings

@@ -32,7 +32,7 @@ class DRIVE {
     DRIVE(RAM *ram, char *bdir = "");
     ~DRIVE();
     void      init();
-    bool      loadCCP();
+    bool      loadCCP(bool verbose = false);
     bool      selDrive(uint8_t drive);
     uint32_t  fileSize(char* fname, uint8_t mode = FILE_READ);
     uint8_t   findFirst(char* fname, uint32_t &fsize);

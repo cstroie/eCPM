@@ -33,7 +33,7 @@
 #define BLS_2048
 
 // RAM cache size (bytes)
-#define RAM_BUFFER_SIZE  (8)
+#define RAM_BUFFER_SIZE  (5)
 
 // CCP file name
 #define CCP_FILE  ("CCP-DR.BIN")

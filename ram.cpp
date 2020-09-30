@@ -30,9 +30,8 @@ RAM::RAM(int CS, uint16_t bufSize) {
 
   // Page buffer
   this->bufSize = bufSize;
-  // Allocate three more bytes: two before (for SP) and one afer
-  // (to make room for 16-bit operations)
-  buf = (uint8_t*)malloc(bufSize + 3);
+  // Allocate one more byte (to make room for 16-bit operations)
+  buf = (uint8_t*)malloc(bufSize + 1);
 }
 
 RAM::~RAM() {
@@ -78,7 +77,7 @@ void RAM::reset() {
 
 // Check if the address is contained in buffer
 bool RAM::inBuffer(uint16_t addr) {
-  return (addr > bufStart and addr < bufEnd);
+  return (addr >= bufStart and addr <= bufEnd);
 }
 
 // Flush the buffer, if dirty, and reset it
@@ -109,18 +108,16 @@ void RAM::bufChange(uint16_t addr) {
   // Check if dirty
   if (bufDirty)
     // Write back the buffer into RAM
-    write(bufStart, buf, bufSize + 3, false);
+    write(bufStart, buf, bufSize + 1, false);
   // Set new start address
-  if      (addr < 2)
-    bufStart = 0x0000;
-  else if (addr > (LASTBYTE - bufSize))
+  if (addr > (LASTBYTE - bufSize))
     bufStart = LASTBYTE - bufSize;
   else
-    bufStart = addr - 2;
+    bufStart = addr;
   // End address
-  bufEnd = bufStart + bufSize - 2;
+  bufEnd = bufStart + bufSize - 1;
   // Fetch the buffer from RAM
-  read(bufStart, buf, bufSize + 3, false);
+  read(bufStart, buf, bufSize + 1, false);
   // Make it clean
   bufDirty = false;
 }

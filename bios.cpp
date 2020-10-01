@@ -281,12 +281,13 @@ void BIOS::punch() {
   punch(cpu->regC());
 }
 void BIOS::punch(uint8_t c) {
-  Serial.write((char)(c & 0x7F));
+  Serial.write((char)(c));
 }
 
 // Reader character input to A (0x1A = device not implemented)
 uint8_t BIOS::reader() {
-  result = 0x1A;
+  while (consts() == 0x00) { }
+  result = Serial.read();
   cpu->regA(result);
   return result;
 }

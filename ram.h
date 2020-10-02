@@ -51,8 +51,8 @@ class RAM {
     void      writeByte(uint16_t addr, uint8_t data);
     uint16_t  readWord(uint16_t addr);
     void      writeWord(uint16_t addr, uint16_t data);
-    void      read(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush = true);
-    void      write(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush = true);
+    void      read(uint16_t addr, uint8_t *buf, uint16_t len);
+    void      write(uint16_t addr, uint8_t *buf, uint16_t len);
     void      hexdump(uint16_t start = 0x0000, uint16_t stop = LASTBYTE, char* comment = "");
 
   private:
@@ -65,7 +65,9 @@ class RAM {
     int cs;
 
     // Buffer
-    void      bufChange(uint16_t addr);
+    void      chBuffer(uint16_t addr);
+    void      rdBuffer();
+    void      wrBuffer();
     uint8_t*  buf;
     bool      bufDirty = false;
     uint16_t  bufSize = 0;

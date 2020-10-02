@@ -19,8 +19,8 @@
 
 #include "ram.h"
 
-RAM::RAM(int CS, uint16_t bufSize) {
-  cs = CS;
+RAM::RAM(int CS, uint16_t bufSize): cs(CS), bufSize(bufSize) {
+  // Initialize the RAM chip
   pinMode(cs, OUTPUT);
   digitalWrite(cs, HIGH);
   delay(50);
@@ -28,8 +28,6 @@ RAM::RAM(int CS, uint16_t bufSize) {
   delay(50);
   digitalWrite(cs, HIGH);
 
-  // Page buffer
-  this->bufSize = bufSize;
   // Allocate one more byte (to make room for 16-bit operations)
   buf = (uint8_t*)malloc(bufSize + 1);
 }
@@ -82,12 +80,8 @@ bool RAM::inBuffer(uint16_t addr) {
 
 // Flush the buffer, if dirty, and reset it
 void RAM::flush() {
-  // Check if dirty
-  if (bufDirty)
-    // Write back the buffer into RAM
-    write(bufStart, buf, bufSize + 1, false);
-  // Make it clean
-  bufDirty = false;
+  // Write back the buffer into RAM
+  wrBuffer();
   // Reset the start and end addresses
   bufStart = LASTBYTE;
   bufEnd = LASTBYTE;
@@ -101,60 +95,68 @@ void RAM::flush(uint16_t addr) {
     flush();
 }
 
-void RAM::bufChange(uint16_t addr) {
+void RAM::chBuffer(uint16_t addr) {
   // Check if the address is contained in buffer
   if (inBuffer(addr))
     return;
-  // Check if dirty
-  if (bufDirty)
-    // Write back the buffer into RAM
-    write(bufStart, buf, bufSize + 1, false);
+  // Write back the buffer into RAM
+  wrBuffer();
   // Set new start address
   if (addr > (LASTBYTE - bufSize))
-    bufStart = LASTBYTE - bufSize;
+    bufStart = LASTBYTE - bufSize + 1;
   else
     bufStart = addr;
   // End address
   bufEnd = bufStart + bufSize - 1;
   // Fetch the buffer from RAM
-  read(bufStart, buf, bufSize + 1, false);
+  rdBuffer();
+}
+
+// Read a buffer from RAM and mark it clean
+void RAM::rdBuffer() {
+  // Read RAM data into buffer
+  read(bufStart, buf, bufSize + 1);
   // Make it clean
   bufDirty = false;
 }
 
+// Write a buffer to RAM, if dirty, and mark it clean
+void RAM::wrBuffer() {
+  if (bufDirty) {
+    // Write buffer data into RAM
+    write(bufStart, buf, bufSize + 1);
+    // Make it clean
+    bufDirty = false;
+  }
+}
+
 uint8_t RAM::getByte(uint16_t addr) {
-  // Check if the address is included in buffer
-  if (not(inBuffer(addr)))
-    // Change the buffer
-    bufChange(addr);
+  // Change the buffer
+  chBuffer(addr);
   // Directly return the byte from the buffer
   return buf[addr - bufStart];
 }
 
 void RAM::setByte(uint16_t addr, uint8_t data) {
-  // Check if the address is included in buffer
-  if (not(inBuffer(addr)))
-    // Change the buffer
-    bufChange(addr);
+  // Change the buffer
+  chBuffer(addr);
   // Directly set the byte into the buffer
   buf[addr - bufStart] = data;
+  // Mark it dirty
   bufDirty = true;
 }
 
 uint16_t RAM::getWord(uint16_t addr) {
-  // Check if the address is included in buffer
-  if (not(inBuffer(addr)))
-    // Change the buffer
-    bufChange(addr);
+  // Change the buffer
+  chBuffer(addr);
   // Directly return the byte from the buffer
-  return buf[addr - bufStart] + buf[addr - bufStart + 1] * 0x0100;
+  return buf[addr - bufStart] +
+         buf[addr - bufStart + 1] * 0x0100;
 }
 
 void RAM::setWord(uint16_t addr, uint16_t data) {
-  // Check if the address is included in buffer
-  if (not(inBuffer(addr)))
-    // Change the buffer
-    bufChange(addr);
+  // Change the buffer
+  chBuffer(addr);
   // Directly set the byte into the buffer
   buf[addr - bufStart]     = lowByte(data);
   buf[addr - bufStart + 1] = highByte(data);
@@ -225,11 +227,8 @@ void RAM::writeWord(uint16_t addr, uint16_t data) {
   end();
 }
 
-void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush) {
+void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
   uint16_t i = 0;
-  // Check first if we need to flush the buffers
-  if (doFlush)
-    flush(addr);
   // Begin SPI transfer
   begin();
   // Command
@@ -245,11 +244,8 @@ void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush) {
   end();
 }
 
-void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len, bool doFlush) {
+void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
   uint16_t i = 0;
-  // Check first if we need to flush the buffers
-  if (doFlush)
-    flush(addr);
   // Begin SPI transfer
   begin();
   // Command

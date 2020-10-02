@@ -33,7 +33,7 @@
 #define BLS_2048
 
 // RAM cache size (bytes)
-#define RAM_BUFFER_SIZE  (5)
+#define RAM_BUFFER_SIZE  (6)
 
 // CCP file name
 #define CCP_FILE  ("CCP-DR.BIN")
@@ -42,7 +42,7 @@
 #define SERIAL_SPEED  (115200)
 
 // SPI speed
-#define SPI_SPEED (20000000)
+#define SPI_SPEED (40000000)
 
 // LED configuration
 #define LEDinv  (true)

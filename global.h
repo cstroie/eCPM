@@ -32,15 +32,16 @@
 #endif
 #define LASTBYTE    (MEM - 1)
 
-#define BIOSCODE    (MEM - 0x0200)        // 0xFE00
-#define BIOSENTRY   (BIOSCODE + 0x0040)   // 0xFE40
-#define BIOSDATA    (BIOSCODE + 0x0100)   // 0xFF00
-#define BIOSDPH     (BIOSDATA + 0x0030)   // 0xFF30
-#define BIOSDPB     (BIOSDATA + 0x0040)   // 0xFF40
-#define BDOSCODE    (MEM - 0x0400)        // 0xFC00
-#define BDOSENTRY   (BDOSCODE + 0x0010)   // 0xFC10
-#define DIRBUF      (BDOSCODE + 0x0100)   // 0xFD00
-#define CCPCODE     (MEM - 0x0C00)        // 0xF400
+// Memory definitions                           64K    48K
+#define BIOSCODE    (MEM - 0x0200)        // 0xFE00 0xBE00
+#define BIOSENTRY   (BIOSCODE + 0x0040)   // 0xFE40 0xBE40
+#define BIOSDATA    (BIOSCODE + 0x0100)   // 0xFF00 0xBF00
+#define BIOSDPH     (BIOSDATA + 0x0030)   // 0xFF30 0xBF30
+#define BIOSDPB     (BIOSDATA + 0x0040)   // 0xFF40 0xBF40
+#define BDOSCODE    (MEM - 0x0400)        // 0xFC00 0xBC00
+#define BDOSENTRY   (BDOSCODE + 0x0010)   // 0xFC10 0xBC10
+#define DIRBUF      (BDOSCODE + 0x0100)   // 0xFD00 0xBD00
+#define CCPCODE     (MEM - 0x0C00)        // 0xF400 0xB400
 
 // Position of the $$$.SUB FCB on this CCP
 #define BATCHFCB    (CCPCODE + 0x07AC)

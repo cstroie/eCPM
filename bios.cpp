@@ -346,7 +346,8 @@ void BIOS::sectran() {
 }
 
 void BIOS::signon() {
-  char buf[80] = "\r\n64K CP/M v2.2 (" PROGNAME " " PROGVERS ")\r\n";
+  char buf[80] = "";
+  sprintf_P(buf, PSTR("\r\n%dK CP/M v2.2 (%s %s)\r\n"), MEMK, PROGNAME, PROGVERS);
   uint8_t i = 0;
   while (buf[i])
     conout(buf[i++]);

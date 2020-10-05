@@ -43,7 +43,7 @@ class MCURAM {
 
   private:
     // Buffer
-    uint8_t  buf[MEM] = {0};
+    uint8_t*  buf;
 };
 
 #endif /* MCURAM_H */

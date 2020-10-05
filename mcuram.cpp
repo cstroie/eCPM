@@ -20,12 +20,12 @@
 #include "mcuram.h"
 
 MCURAM::MCURAM() {
-  // Allocate one more byte (to make room for 16-bit operations)
-  //buf = (uint8_t*)malloc(MEM);
+  // Allocate RAM
+  buf = (uint8_t*)malloc(MEM);
 }
 
 MCURAM::~MCURAM() {
-  //free(buf);
+  free(buf);
 }
 
 void MCURAM::init() {

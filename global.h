@@ -20,6 +20,10 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+/* Software name and version */
+#define PROGNAME    "eCPM"
+#define PROGVERS    "0.2"
+
 /* Memory size */
 #ifdef SPI_RAM
 #define MEM         (64 * 1024)

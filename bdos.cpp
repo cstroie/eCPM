@@ -18,7 +18,6 @@
 */
 
 #include "bdos.h"
-#include <SD.h>
 
 // BDOS CALLS
 const char* BDOS_CALLS[] = {"WBOOT", "GETCON", "OUTCON", "GETRDR", "PUNCH", "LIST",

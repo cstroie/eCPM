@@ -471,26 +471,39 @@ bool DRIVE::create(char* cname) {
 }
 
 // Remove a file from SD card.
-// FIXME
 bool DRIVE::remove(char* cname) {
+  char *fname;
+  // Build the path
+  fname = cname + FNHOST;
+  cname2fname(cname, fname);
   ledOn();
-  SD.remove(cname + FNHOST); // FIXME
+  if (SD.exists(fname))
+    SD.remove(fname);
   ledOff();
   return true;
 }
 
-// FIXME
+/*
+  Rename a file
+
+  // Requires the following in SDClass
+  bool rename(const char* pathFrom, const char* pathTo) {
+    return (boolean)SDFS.rename(pathFrom, pathTo);
+  }
+*/
 bool DRIVE::rename(char* cname, char* newname) {
   bool result = false;
+  char *fname, *nfname;
+  // Remove the existing file
+  remove(newname);
+  // Build the path
+  fname = cname + FNHOST;
+  cname2fname(cname, fname);
+  nfname = newname + FNHOST;
+  cname2fname(newname, nfname);
   ledOn();
-  // Check the file is open in write mode
-  if (check(cname, FILE_WRITE)) {
-    // FIXME
-    //if (file.rename(newname)) {
-    //  file.close();
-    //  result = true;
-    //}
-  }
+  if (SD.exists(fname))
+    SD.rename(fname, nfname);
   ledOff();
   return result;
 }

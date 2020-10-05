@@ -19,11 +19,7 @@
 
 
 #include <SPI.h>
-//#include <SdFat.h>
 #include <SD.h>
-
-// Need to specify the namespace for SdFat
-//using namespace sdfat;
 
 #if defined(ESP8266)
 #include <Ticker.h>

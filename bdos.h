@@ -21,11 +21,6 @@
 #define BDOS_H
 
 #include "Arduino.h"
-#include <SD.h>
-//#include <SdFat.h>
-// Need to specify the namespace for SdFat
-//using namespace sdfat;
-
 #include "global.h"
 #include "config.h"
 #include "i8080.h"

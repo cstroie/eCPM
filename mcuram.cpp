@@ -50,23 +50,26 @@ void MCURAM::flush(uint16_t addr) {
 
 uint8_t MCURAM::getByte(uint16_t addr) {
   // Directly return the byte from the buffer
-  return buf[addr];
+  return addr < MEM ? buf[addr] : 0xFF;
 }
 
 void MCURAM::setByte(uint16_t addr, uint8_t data) {
   // Directly set the byte into the buffer
-  buf[addr] = data;
+  if (addr < MEM)
+    buf[addr] = data;
 }
 
 uint16_t MCURAM::getWord(uint16_t addr) {
   // Directly return the byte from the buffer
-  return buf[addr] + buf[addr + 1] * 0x0100;
+  return addr < LASTBYTE ? (buf[addr] + buf[addr + 1] * 0x0100) : 0xFFFF;
 }
 
 void MCURAM::setWord(uint16_t addr, uint16_t data) {
   // Directly set the byte into the buffer
-  buf[addr]     = lowByte(data);
-  buf[addr + 1] = highByte(data);
+  if (addr < LASTBYTE) {
+    buf[addr]     = lowByte(data);
+    buf[addr + 1] = highByte(data);
+  }
 }
 
 void MCURAM::read(uint16_t addr, uint8_t *data, uint16_t len) {

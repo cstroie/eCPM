@@ -21,7 +21,11 @@
 #define GLOBAL_H
 
 /* Memory size */
+#ifdef SPI_RAM
 #define MEM         (64 * 1024)
+#else
+#define MEM         (48 * 1024)
+#endif
 #define LASTBYTE    (MEM - 1)
 
 #define BIOSCODE    (MEM - 0x0200)        // 0xFE00

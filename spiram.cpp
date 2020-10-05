@@ -1,5 +1,5 @@
 /**
-  ram.cpp - SPI RAM management
+  spiram.cpp - SPI RAM management
 
   Copyright (C) 2018 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -17,9 +17,9 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "ram.h"
+#include "spiram.h"
 
-RAM::RAM(int CS, uint16_t bufSize): cs(CS), bufSize(bufSize) {
+SPIRAM::SPIRAM(int CS, uint16_t bufSize): cs(CS), bufSize(bufSize) {
   // Initialize the RAM chip
   pinMode(cs, OUTPUT);
   digitalWrite(cs, HIGH);
@@ -32,18 +32,18 @@ RAM::RAM(int CS, uint16_t bufSize): cs(CS), bufSize(bufSize) {
   buf = (uint8_t*)malloc(bufSize + 1);
 }
 
-RAM::~RAM() {
+SPIRAM::~SPIRAM() {
   free(buf);
 }
 
-void RAM::init() {
+void SPIRAM::init() {
   begin();
   SPI.transfer(CMD_WRMR);
   SPI.transfer(MODE_SEQ);
   end();
 }
 
-void RAM::clear() {
+void SPIRAM::clear() {
   // Begin SPI transfer
   begin();
   // Command
@@ -64,7 +64,7 @@ void RAM::clear() {
   end();
 }
 
-void RAM::reset() {
+void SPIRAM::reset() {
   // Begin SPI transfer
   begin();
   // Command
@@ -74,12 +74,12 @@ void RAM::reset() {
 }
 
 // Check if the address is contained in buffer
-bool RAM::inBuffer(uint16_t addr) {
+bool SPIRAM::inBuffer(uint16_t addr) {
   return (addr >= bufStart and addr <= bufEnd);
 }
 
 // Flush the buffer, if dirty, and reset it
-void RAM::flush() {
+void SPIRAM::flush() {
   // Write back the buffer into RAM
   wrBuffer();
   // Reset the start and end addresses
@@ -88,14 +88,14 @@ void RAM::flush() {
 }
 
 // Flush the buffer, if dirty and the address is contained, and reset it
-void RAM::flush(uint16_t addr) {
+void SPIRAM::flush(uint16_t addr) {
   // Check if the address is contained in buffer
   if (inBuffer(addr))
     // Need to flush
     flush();
 }
 
-void RAM::chBuffer(uint16_t addr) {
+void SPIRAM::chBuffer(uint16_t addr) {
   // Check if the address is contained in buffer
   if (inBuffer(addr))
     return;
@@ -113,7 +113,7 @@ void RAM::chBuffer(uint16_t addr) {
 }
 
 // Read a buffer from RAM and mark it clean
-void RAM::rdBuffer() {
+void SPIRAM::rdBuffer() {
   // Read RAM data into buffer
   read(bufStart, buf, bufSize + 1);
   // Make it clean
@@ -121,7 +121,7 @@ void RAM::rdBuffer() {
 }
 
 // Write a buffer to RAM, if dirty, and mark it clean
-void RAM::wrBuffer() {
+void SPIRAM::wrBuffer() {
   if (bufDirty) {
     // Write buffer data into RAM
     write(bufStart, buf, bufSize + 1);
@@ -130,14 +130,14 @@ void RAM::wrBuffer() {
   }
 }
 
-uint8_t RAM::getByte(uint16_t addr) {
+uint8_t SPIRAM::getByte(uint16_t addr) {
   // Change the buffer
   chBuffer(addr);
   // Directly return the byte from the buffer
   return buf[addr - bufStart];
 }
 
-void RAM::setByte(uint16_t addr, uint8_t data) {
+void SPIRAM::setByte(uint16_t addr, uint8_t data) {
   // Change the buffer
   chBuffer(addr);
   // Directly set the byte into the buffer
@@ -146,7 +146,7 @@ void RAM::setByte(uint16_t addr, uint8_t data) {
   bufDirty = true;
 }
 
-uint16_t RAM::getWord(uint16_t addr) {
+uint16_t SPIRAM::getWord(uint16_t addr) {
   // Change the buffer
   chBuffer(addr);
   // Directly return the byte from the buffer
@@ -154,7 +154,7 @@ uint16_t RAM::getWord(uint16_t addr) {
          buf[addr - bufStart + 1] * 0x0100;
 }
 
-void RAM::setWord(uint16_t addr, uint16_t data) {
+void SPIRAM::setWord(uint16_t addr, uint16_t data) {
   // Change the buffer
   chBuffer(addr);
   // Directly set the byte into the buffer
@@ -164,7 +164,7 @@ void RAM::setWord(uint16_t addr, uint16_t data) {
 }
 
 
-uint8_t RAM::readByte(uint16_t addr) {
+uint8_t SPIRAM::readByte(uint16_t addr) {
   // Begin SPI transfer
   begin();
   // Command
@@ -180,7 +180,7 @@ uint8_t RAM::readByte(uint16_t addr) {
   return result;
 }
 
-void RAM::writeByte(uint16_t addr, uint8_t data) {
+void SPIRAM::writeByte(uint16_t addr, uint8_t data) {
   // Begin SPI transfer
   begin();
   // Command
@@ -195,7 +195,7 @@ void RAM::writeByte(uint16_t addr, uint8_t data) {
   end();
 }
 
-uint16_t RAM::readWord(uint16_t addr) {
+uint16_t SPIRAM::readWord(uint16_t addr) {
   // Begin SPI transfer
   begin();
   // Command
@@ -211,7 +211,7 @@ uint16_t RAM::readWord(uint16_t addr) {
   return result;
 }
 
-void RAM::writeWord(uint16_t addr, uint16_t data) {
+void SPIRAM::writeWord(uint16_t addr, uint16_t data) {
   // Begin SPI transfer
   begin();
   // Command
@@ -227,7 +227,7 @@ void RAM::writeWord(uint16_t addr, uint16_t data) {
   end();
 }
 
-void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
+void SPIRAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
   uint16_t i = 0;
   // Begin SPI transfer
   begin();
@@ -244,7 +244,7 @@ void RAM::read(uint16_t addr, uint8_t *buf, uint16_t len) {
   end();
 }
 
-void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
+void SPIRAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
   uint16_t i = 0;
   // Begin SPI transfer
   begin();
@@ -262,7 +262,7 @@ void RAM::write(uint16_t addr, uint8_t *buf, uint16_t len) {
 }
 
 
-void RAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
+void SPIRAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
   char buf[16];
   char val[4];
   uint8_t data;
@@ -326,12 +326,12 @@ void RAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
 }
 
 
-void RAM::begin() {
+void SPIRAM::begin() {
   SPI.beginTransaction(SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
   digitalWrite(cs, LOW);
 }
 
-void RAM::end() {
+void SPIRAM::end() {
   digitalWrite(cs, HIGH);
   SPI.endTransaction();
 }

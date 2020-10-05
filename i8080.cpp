@@ -34,7 +34,6 @@
 */
 
 #include "i8080.h"
-#include "ram.h"
 
 #define RD_BYTE(addr) read_byte(addr)
 #define RD_WORD(addr) read_word(addr)

@@ -1,5 +1,5 @@
 /**
-  ram.h - SPI RAM management
+  mcuram.h - MCU RAM management
 
   Copyright (C) 2020 Costin STROIE <costinstroie@eridu.eu.org>
 
@@ -17,27 +17,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RAM_H
-#define RAM_H
+#ifndef MCURAM_H
+#define MCURAM_H
 
 #include <Arduino.h>
-#include "SPI.h"
 #include "config.h"
 #include "global.h"
 
-// SPI RAM commands
-enum SPIRAM_CMNDS {CMD_WRMR  = 0x01, CMD_RDMR = 0x05,
-                   CMD_WRITE = 0x02, CMD_READ = 0x03,
-                   CMD_RSTIO = 0xFF
-                  };
-// SPI RAM transfer modes
-enum SPIRAM_MODES {MODE_BYTE = 0x00, MODE_SEQ = 0x40, MODE_PAGE = 0x80};
-
-
-class RAM {
+class MCURAM {
   public:
-    RAM(int CS = SS, uint16_t bufSize = 16);
-    ~RAM();
+    MCURAM();
+    ~MCURAM();
     void      init();
     void      clear();
     void      reset();
@@ -47,33 +37,13 @@ class RAM {
     void      setByte(uint16_t addr, uint8_t data);
     uint16_t  getWord(uint16_t addr);
     void      setWord(uint16_t addr, uint16_t data);
-    uint8_t   readByte(uint16_t addr);
-    void      writeByte(uint16_t addr, uint8_t data);
-    uint16_t  readWord(uint16_t addr);
-    void      writeWord(uint16_t addr, uint16_t data);
-    void      read(uint16_t addr, uint8_t *buf, uint16_t len);
-    void      write(uint16_t addr, uint8_t *buf, uint16_t len);
+    void      read(uint16_t addr, uint8_t *data, uint16_t len);
+    void      write(uint16_t addr, uint8_t *data, uint16_t len);
     void      hexdump(uint16_t start = 0x0000, uint16_t stop = LASTBYTE, char* comment = "");
 
   private:
-    // SPI transactions
-    void begin();
-    void end();
-    bool inBuffer(uint16_t addr);
-
-    // Chip select
-    int cs;
-
     // Buffer
-    void      chBuffer(uint16_t addr);
-    void      rdBuffer();
-    void      wrBuffer();
-    uint8_t*  buf;
-    bool      bufDirty = false;
-    uint16_t  bufSize = 0;
-    uint16_t  bufHalfSize = 0;
-    uint16_t  bufStart = LASTBYTE;
-    uint16_t  bufEnd = LASTBYTE;
+    uint8_t  buf[MEM] = {0};
 };
 
-#endif /* RAM_H */
+#endif /* MCURAM_H */

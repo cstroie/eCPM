@@ -24,7 +24,11 @@
 #include <SD.h>
 #include "global.h"
 #include "config.h"
-#include "ram.h"
+#ifdef SPI_RAM
+#include "spiram.h"
+#else
+#include "mcuram.h"
+#endif
 
 
 class DRIVE {

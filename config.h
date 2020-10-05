@@ -29,6 +29,9 @@
 //#define DEBUG_FCB_WRITE
 //#define DEBUG_DIRENTRY
 
+// Use MCU or SPI RAM
+//#define SPI_RAM
+
 // File system block size
 #define BLS_2048
 
@@ -36,7 +39,11 @@
 #define RAM_BUFFER_SIZE  (6)
 
 // CCP file name
-#define CCP_FILE  ("CCP-DR.BIN")
+#ifdef SPI_RAM
+#define CCP_FILE  ("CCP-DR64.BIN")
+#else
+#define CCP_FILE  ("CCP-DR48.BIN")
+#endif
 
 // Serial port speed
 #define SERIAL_SPEED  (115200)

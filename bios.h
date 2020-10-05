@@ -24,7 +24,11 @@
 #include "global.h"
 #include "config.h"
 #include "i8080.h"
-#include "ram.h"
+#ifdef SPI_RAM
+#include "spiram.h"
+#else
+#include "mcuram.h"
+#endif
 #include "drive.h"
 
 

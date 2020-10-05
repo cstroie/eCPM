@@ -31,7 +31,11 @@
 // Configuration
 #include "config.h"
 
-#include "ram.h"
+#ifdef SPI_RAM
+#include "spiram.h"
+#else
+#include "mcuram.h"
+#endif
 #include "i8080.h"
 #include "bios.h"
 #include "bdos.h"
@@ -43,8 +47,13 @@ void    callBIOS(int port, int value);
 // The ticker
 Ticker oneSec;
 
+#ifdef SPI_RAM
 // SPI RAM
-RAM ram(D0, RAM_BUFFER_SIZE);
+SPIRAM ram(D0, RAM_BUFFER_SIZE);
+#else
+// MCU RAM
+MCURAM ram;
+#endif
 
 int  I8080::read_word(int addr) {
   return ram.getWord(addr);
@@ -107,9 +116,11 @@ void setup() {
   SPI.begin();
   // Init the DRIVE
   drv.init();
+#ifdef SPI_RAM
   // Init the SPI RAM
   // FIXME This breaks the SPI
   //ram.init();
+#endif
   // Init the BIOS
   bios.init();
   // Init the BDOS

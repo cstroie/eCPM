@@ -26,8 +26,10 @@
 #include "config.h"
 #ifdef SPI_RAM
 #include "spiram.h"
+typedef SPIRAM RAM;
 #else
 #include "mcuram.h"
+typedef MCURAM RAM;
 #endif
 
 

@@ -31,8 +31,10 @@
 #include "i8080.h"
 #ifdef SPI_RAM
 #include "spiram.h"
+typedef SPIRAM RAM;
 #else
 #include "mcuram.h"
+typedef MCURAM RAM;
 #endif
 #include "drive.h"
 #include "bios.h"

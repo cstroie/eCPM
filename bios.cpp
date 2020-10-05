@@ -18,7 +18,6 @@
 */
 
 #include "bios.h"
-#include "ccp.h"
 
 // BIOS CALLS
 const char* BIOS_CALLS[] = {"BOOT", "WBOOT", "CONST", "CONIN", "CONOUT", "LIST",

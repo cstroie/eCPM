@@ -17,14 +17,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Ticker.h>
+
 #include <SPI.h>
 //#include <SdFat.h>
-
 #include <SD.h>
 
 // Need to specify the namespace for SdFat
 //using namespace sdfat;
+
+#if defined(ESP8266)
+#include <Ticker.h>
+#endif
 
 // Global parameters
 #include "global.h"
@@ -44,12 +47,14 @@
 uint8_t callBDOS(int port);
 void    callBIOS(int port, int value);
 
+#if defined(ESP8266)
 // The ticker
 Ticker oneSec;
+#endif
 
 #ifdef SPI_RAM
 // SPI RAM
-SPIRAM ram(D0, RAM_BUFFER_SIZE);
+SPIRAM ram(RS, RAM_BUFFER_SIZE);
 #else
 // MCU RAM
 MCURAM ram;
@@ -107,8 +112,8 @@ void callTicker() {
 */
 void setup() {
   // LED configuration
-  pinMode(BUILTIN_LED, OUTPUT);
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, LOW ^ LEDinv);
   // Serial port configuration
   Serial.begin(SERIAL_SPEED);
   Serial.print("\r\n\r\n");
@@ -126,8 +131,10 @@ void setup() {
   // Init the BDOS
   bdos.init();
 
+#ifdef ESP8266
   // Attach the handler to the one second ticker
   oneSec.attach(1, callTicker);
+#endif
 
   // RAM hex dump
   //ram.hexdump(0x0000, 0x0200);

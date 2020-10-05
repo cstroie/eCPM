@@ -20,16 +20,19 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "config.h"
+
 /* Software name and version */
 #define PROGNAME    "eCPM"
 #define PROGVERS    "0.2"
 
 /* Memory size */
 #ifdef SPI_RAM
-#define MEM         (64 * 1024)
+#define MEMK        (64)
 #else
-#define MEM         (48 * 1024)
+#define MEMK        (48)
 #endif
+#define MEM         (MEMK * 1024)
 #define LASTBYTE    (MEM - 1)
 
 // Memory definitions                           64K    48K
@@ -98,5 +101,21 @@
 /* HEX conversion macros */
 #define toHEX(x)    ((x) < 10 ? (x) + 48 : (x) + 87)
 #define frHEX(x)    (((x) >= '0' && (x) <= '9') ? ((x) - '0') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : (((x) >= 'A' && (x) <= 'F') ? ((x) - 'A') : 0)))
+
+/* LED macro fixing */
+#if   defined(BUILTIN_LED)
+#define LED         BUILTIN_LED
+#elif defined(LED_BUILTIN)
+#define LED         LED_BUILTIN
+#else
+#define LED         (13)
+#endif
+
+/* SPI RAM chip select */
+#ifdef ESP8266
+#define RS          (D0)
+#else
+#define RS          (9)
+#endif
 
 #endif /* GLOBAL_H */

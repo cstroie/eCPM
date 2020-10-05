@@ -17,6 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <SPI.h>
 #include "drive.h"
 
 DRIVE::DRIVE(RAM *ram, char *bdir): ram(ram), bDir(bdir) {
@@ -29,14 +30,29 @@ DRIVE::~DRIVE() {
   Init the SD drive
 */
 void DRIVE::init() {
+  bool result;
   Serial.print("eCPM: Initializing SD card...");
-  if (!SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0))) {
+#ifdef ESP8266
+  result = SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
+#else
+  result = SD.begin(SS);
+#endif
+  if (not result) {
     Serial.println(" failed!");
     while (true) {
 #if defined(ESP8266)
       // ESP 8266
       yield();
 #endif
+      // Flash the led
+      digitalWrite(LED, HIGH ^ LEDinv);
+      delay(50);
+      digitalWrite(LED, LOW ^ LEDinv);
+      delay(50);
+      digitalWrite(LED, HIGH ^ LEDinv);
+      delay(50);
+      digitalWrite(LED, LOW ^ LEDinv);
+      delay(250);
     }
   }
   else
@@ -47,14 +63,14 @@ void DRIVE::init() {
   Turn the drive led on
 */
 void DRIVE::ledOn() {
-  digitalWrite(BUILTIN_LED, HIGH ^ LEDinv);
+  digitalWrite(LED, HIGH ^ LEDinv);
 }
 
 /*
   Turn the drive led off
 */
 void DRIVE::ledOff() {
-  digitalWrite(BUILTIN_LED, LOW ^ LEDinv);
+  digitalWrite(LED, LOW ^ LEDinv);
 }
 
 /*

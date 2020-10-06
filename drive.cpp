@@ -20,7 +20,7 @@
 #include <SPI.h>
 #include "drive.h"
 
-time_t timeCallback() {
+uint32_t timeCallback() {
   return 1601984632;
 }
 
@@ -44,10 +44,7 @@ void DRIVE::init() {
   if (not result) {
     Serial.println(" failed!");
     while (true) {
-#if defined(ESP8266)
-      // ESP 8266
       yield();
-#endif
       // Flash the led
       digitalWrite(LED, HIGH ^ LEDinv);
       delay(50);
@@ -131,10 +128,7 @@ bool DRIVE::loadCCP(bool verbose) {
     if (verbose)
       Serial.println(" failed!");
     while (true) {
-#if defined(ESP8266)
-      // ESP 8266
       yield();
-#endif
     }
   }
   else if (verbose)

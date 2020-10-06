@@ -56,9 +56,7 @@ void SPIRAM::clear() {
   for (int x = 0x00; x <= 0xFF; ++x) {
     for (int y = 0x00; y <= 0xFF; ++y)
       SPI.transfer(0x00);
-#if defined(ESP8266)
     yield();
-#endif
   }
   // End SPI transfer
   end();
@@ -289,10 +287,7 @@ void SPIRAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
   SPI.transfer(lowByte(start));
   // All bytes
   for (uint16_t addr = start; addr <= stop;) {
-#if defined(ESP8266)
-    // ESP 8266
     yield();
-#endif
     // Use the buffer to display the address
     sprintf_P(buf, PSTR("%04X: "), addr);
     Serial.print(buf);

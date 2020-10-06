@@ -32,9 +32,6 @@ void MCURAM::init() {
 }
 
 void MCURAM::clear() {
-#if defined(ESP8266)
-  yield();
-#endif
 }
 
 void MCURAM::reset() {
@@ -97,10 +94,7 @@ void MCURAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
   }
   // All bytes
   for (uint16_t addr = start; addr <= stop;) {
-#if defined(ESP8266)
-    // ESP 8266
     yield();
-#endif
     // Use the buffer to display the address
     sprintf_P(prt, PSTR("%04X: "), addr);
     Serial.print(prt);

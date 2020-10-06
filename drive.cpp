@@ -20,6 +20,10 @@
 #include <SPI.h>
 #include "drive.h"
 
+time_t timeCallback() {
+  return 1601984632;
+}
+
 DRIVE::DRIVE(RAM *ram, char *bdir): ram(ram), bDir(bdir) {
 }
 
@@ -55,8 +59,25 @@ void DRIVE::init() {
       delay(250);
     }
   }
-  else
-    Serial.println(" done.");
+  else {
+    Serial.print(" ");
+    switch (SD.type()) {
+      case 1:
+        Serial.print("SD1");
+        break;
+      case 2:
+        Serial.print("SD2");
+        break;
+      case 3:
+        Serial.print("SDHC");
+        break;
+      default:
+        Serial.println("Unknown");
+    }
+    Serial.printf(" FAT%d %dMb\r\n", SD.fatType(), SD.size64() / 1048576);
+    // Set time callback
+    SD.setTimeCallback(timeCallback);
+  }
 }
 
 /*

@@ -42,28 +42,4 @@ You are the giants on whose shoulders we stand.
 Keep  in mind this is work in progress,  a lot might change.
 Or not.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-1
-
-
-
-
-
-
+This README was typed on eCPM, with WordStar 3.3, VT100 patched.

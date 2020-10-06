@@ -20,7 +20,7 @@
 #include <SPI.h>
 #include "drive.h"
 
-uint32_t timeCallback() {
+long int timeCallback() {
   return 1601984632;
 }
 

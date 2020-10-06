@@ -36,7 +36,7 @@
 #define BLS_2048
 
 // RAM cache size (bytes)
-#define RAM_BUFFER_SIZE  (6)
+#define RAM_BUFFER_SIZE  (4)
 
 // CCP file name
 #ifdef SPI_RAM

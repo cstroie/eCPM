@@ -163,7 +163,7 @@ void BIOS::call(uint16_t code) {
       break;
 
     case 0x07:  // READER
-      // Reader character input to A (0x1A = device not implemented)
+      // Reader character input to A
       reader();
       break;
 

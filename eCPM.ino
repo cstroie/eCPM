@@ -25,10 +25,10 @@
 #include <Ticker.h>
 #endif
 
-// Global parameters
-#include "global.h"
 // Configuration
 #include "config.h"
+// Global parameters
+#include "global.h"
 
 #ifdef SPI_RAM
 #include "spiram.h"
@@ -59,7 +59,6 @@ MCURAM ram;
 int  I8080::read_word(int addr) {
   return ram.getWord(addr);
 }
-
 void I8080::write_word(int addr, int word) {
   return ram.setWord(addr, word);
 }
@@ -67,7 +66,6 @@ void I8080::write_word(int addr, int word) {
 int  I8080::read_byte(int addr) {
   return ram.getByte(addr);
 }
-
 void I8080::write_byte(int addr, int byte) {
   ram.setByte(addr, byte);
 }

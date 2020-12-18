@@ -85,12 +85,12 @@ void MCURAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
   start &= 0xFFF0;
   stop  |= 0x000F;
   // Start with a new line
-  Serial.print("\r\n");
+  Serial.print(F("\r\n"));
   // Print the comment
   if (comment[0]) {
-    Serial.print("; ");
+    Serial.print(F("; "));
     Serial.print(comment);
-    Serial.print("\r\n");
+    Serial.print(F("\r\n"));
   }
   // All bytes
   for (uint16_t addr = start; addr <= stop;) {
@@ -121,6 +121,6 @@ void MCURAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
     for (uint8_t idx = 0; idx < 0x10; idx++)
       Serial.write(prt[idx]);
     // New line
-    Serial.print("|\r\n");
+    Serial.print(F("|\r\n"));
   }
 }

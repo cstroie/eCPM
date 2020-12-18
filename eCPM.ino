@@ -110,7 +110,7 @@ void setup() {
   digitalWrite(LED, LOW ^ LEDinv);
   // Serial port configuration
   Serial.begin(SERIAL_SPEED);
-  Serial.print("\r\n\r\n");
+  Serial.print(F("\r\n\r\n"));
   // SPI
   SPI.begin();
   // Init the DRIVE

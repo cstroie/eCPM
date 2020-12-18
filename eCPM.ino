@@ -21,10 +21,6 @@
 #include <SPI.h>
 #include <SD.h>
 
-#if defined(ESP8266)
-#include <Ticker.h>
-#endif
-
 // Configuration
 #include "config.h"
 // Global parameters
@@ -43,10 +39,8 @@
 uint8_t callBDOS(int port);
 void    callBIOS(int port, int value);
 
-#if defined(ESP8266)
-// The ticker
-Ticker oneSec;
-#endif
+// Ticker interval
+const uint32_t tick = 1000;
 
 #ifdef SPI_RAM
 // SPI RAM
@@ -125,11 +119,6 @@ void setup() {
   // Init the BDOS
   bdos.init();
 
-#ifdef ESP8266
-  // Attach the handler to the one second ticker
-  oneSec.attach(1, callTicker);
-#endif
-
   // RAM hex dump
   //ram.hexdump(0x0000, 0x0200);
 
@@ -141,9 +130,19 @@ void setup() {
   Main Arduino loop
 */
 void loop() {
+  // The ticker
+  static uint32_t nextTick = millis();
+
+  // Check the CPU state and run
   if (cpu.state) {
     cpu.instruction();
     //cpu.trace();
+  }
+
+  // The ticker
+  if (millis() > nextTick) {
+    callTicker();
+    nextTick += tick;
   }
 
   //delay(100);

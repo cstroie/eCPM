@@ -34,7 +34,7 @@ BIOS::~BIOS() {
 void BIOS::init() {
   uint16_t j;
 
-  Serial.print("eCPM: Initializing BIOS...");
+  Serial.print(F("eCPM: Initializing BIOS: "));
   // Patch in the BIOS jump vectors (17 functions)
   for (uint8_t i = 0; i < 17; i++) {
     // Compute an offset
@@ -102,7 +102,7 @@ void BIOS::init() {
   ram->setWord(addr++, dpb.cks); addr++;
   ram->setWord(addr++, dpb.off);
   ram->flush();
-  Serial.print(" done.\r\n");
+  Serial.printf("0x%04X\r\n", BIOSCODE);
 
   // Load CCP
   drv->loadCCP(true);
@@ -116,13 +116,13 @@ void BIOS::init() {
 
 void BIOS::call(uint16_t code) {
 #ifdef DEBUG_BIOS_CALLS
-  Serial.print("\r\n\t\tBIOS call 0x");
+  Serial.print(F("\r\n\t\tBIOS call 0x"));
   Serial.print(code, HEX);
   if (code <= 17) {
     Serial.print("\t");
     Serial.print(BIOS_CALLS[code]);
   }
-  Serial.print("\r\n");
+  Serial.print(F("\r\n"));
   cpu->trace();
 #endif
 
@@ -215,9 +215,9 @@ void BIOS::call(uint16_t code) {
     default:
 #ifdef DEBUG_BIOS_CALLS
       // Show unimplemented BIOS calls only when debugging
-      Serial.print("\r\nUnimplemented BIOS call: 0x");
+      Serial.print(F("\r\nUnimplemented BIOS call: 0x"));
       Serial.print(code, HEX);
-      Serial.print("\r\n");
+      Serial.print(F("\r\n"));
       cpu->trace();
 #endif
       break;

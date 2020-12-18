@@ -35,14 +35,14 @@ DRIVE::~DRIVE() {
 */
 void DRIVE::init() {
   bool result;
-  Serial.print("eCPM: Initializing SD card...");
+  Serial.print(F("eCPM: Initializing SD card: "));
 #ifdef ESP8266
   result = SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
 #else
   result = SD.begin(SS);
 #endif
   if (not result) {
-    Serial.println(" failed!");
+    Serial.println(F("failed!"));
     while (true) {
       yield();
       // Flash the led
@@ -57,19 +57,18 @@ void DRIVE::init() {
     }
   }
   else {
-    Serial.print(" ");
     switch (SD.type()) {
       case 1:
-        Serial.print("SD1");
+        Serial.print(F("SD1"));
         break;
       case 2:
-        Serial.print("SD2");
+        Serial.print(F("SD2"));
         break;
       case 3:
-        Serial.print("SDHC");
+        Serial.print(F("SDHC"));
         break;
       default:
-        Serial.println("Unknown");
+        Serial.println(F("Unknown"));
     }
     Serial.printf(" FAT%d %dMb\r\n", SD.fatType(), SD.size64() / 1048576);
     // Set time callback
@@ -104,9 +103,9 @@ bool DRIVE::loadCCP(bool verbose) {
   strcat(fPath, CCP_FILE);
   if (verbose) {
     // Message
-    Serial.print("eCPM: Loading ");
+    Serial.print(F("eCPM: Loading "));
     Serial.print(fPath);
-    Serial.print("...");
+    Serial.print(F(": "));
   }
   // Check if the file exists
   if (file = SD.open(fPath, FILE_READ)) {
@@ -126,13 +125,14 @@ bool DRIVE::loadCCP(bool verbose) {
   }
   if (not result) {
     if (verbose)
-      Serial.println(" failed!");
+      Serial.println(F(" failed!"));
     while (true) {
       yield();
     }
   }
   else if (verbose)
-    Serial.println(" done.");
+    Serial.printf("0x%04X\r\n", CCPCODE);
+
 
 #ifdef DEBUG
   ram->hexdump(CCPCODE, CCPCODE + 0x10, "CCP");

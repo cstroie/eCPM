@@ -37,7 +37,7 @@ BDOS::~BDOS() {
 }
 
 void BDOS::init() {
-  Serial.print("eCPM: Initializing BDOS...");
+  Serial.print(F("eCPM: Initializing BDOS: "));
   // Serial number, 6 bytes
   uint8_t cpmSerialNo[] = {0, 22, 0, 0, 0, 0};
   ram->write(BDOSCODE, cpmSerialNo, sizeof(cpmSerialNo));
@@ -50,7 +50,7 @@ void BDOS::init() {
   ram->setByte(BDOSENTRY,     0xDB);      // IN A, (0x00)
   ram->setByte(BDOSENTRY + 1, 0x00);
   ram->setByte(BDOSENTRY + 2, 0xC9);      // RET
-  Serial.print(" done.\r\n");
+  Serial.printf("0x%04X\r\n", BDOSCODE);
 
 #ifdef DEBUG
   ram->hexdump(BDOSCODE,  BDOSCODE  + 0x10, "BDOS");
@@ -76,13 +76,13 @@ uint8_t BDOS::call(uint16_t port) {
   result = 0x0000;
 
 #ifdef DEBUG_BDOS_CALLS
-  Serial.print("\r\n\t\tBDOS call 0x");
+  Serial.print(F("\r\n\t\tBDOS call 0x"));
   Serial.print(func, HEX);
   if (func <= 41) {
     Serial.print("\t");
     Serial.print(BDOS_CALLS[func]);
   }
-  Serial.print("\r\n");
+  Serial.print(F("\r\n"));
   cpu->trace();
 #endif
 

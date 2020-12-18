@@ -582,17 +582,15 @@ bool DRIVE::ckLST() {
   Flush the LST file after a while
 */
 void DRIVE::fsLST() {
-  // Check if the file is open
-  if (devLST)
-    // Check if the timestamp has been set
-    if (tsLST > 0)
-      // Check if timed out (10 seconds)
-      if (millis() - tsLST > 100000UL) {
-        ledOn();
-        // Flush the file
-        devLST.flush();
-        ledOff();
-      }
+  // Check if the file is open and the timestamp has been set
+  if (devLST and tsLST > 0)
+    // Check if timed out (10 seconds)
+    if (millis() - tsLST > 10000UL) {
+      ledOn();
+      // Flush the file
+      devLST.flush();
+      ledOff();
+    }
 }
 
 /*

@@ -36,6 +36,7 @@ BDOS::BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios): cpu(cpu), ram(ram), dr
 BDOS::~BDOS() {
 }
 
+// Prepare the BDOS
 void BDOS::init() {
   Serial.print(F("eCPM: Initializing BDOS: "));
   // Serial number, 6 bytes
@@ -58,6 +59,7 @@ void BDOS::init() {
 #endif
 }
 
+// Dispatch the BDOS call
 uint8_t BDOS::call(uint16_t port) {
   uint16_t  w;
   uint8_t   b, count, eparam;
@@ -801,6 +803,7 @@ uint8_t BDOS::call(uint16_t port) {
 }
 
 
+// Display and return the error
 void BDOS::bdosError(uint8_t err) {
   Serial.print("\r\nBdos Err On ");
   Serial.print((char)(cDrive + 'A'));

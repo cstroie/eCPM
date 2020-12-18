@@ -31,8 +31,12 @@ BIOS::BIOS(I8080 *cpu, RAM *ram, DRIVE *drv): cpu(cpu), ram(ram), drv(drv) {
 BIOS::~BIOS() {
 }
 
+// Prepare the BIOS
 void BIOS::init() {
   uint16_t j;
+
+  // Set the ticker
+  nextTick = millis();
 
   Serial.print(F("eCPM: Initializing BIOS: "));
   // Patch in the BIOS jump vectors (17 functions)
@@ -114,6 +118,17 @@ void BIOS::init() {
 }
 
 
+// Turn the BIOS led on
+void BIOS::ledOn() {
+  digitalWrite(LED, HIGH ^ LEDinv);
+}
+
+// Turn the BIOS led off
+void BIOS::ledOff() {
+  digitalWrite(LED, LOW ^ LEDinv);
+}
+
+// Dispatch the BIOS call
 void BIOS::call(uint16_t code) {
 #ifdef DEBUG_BIOS_CALLS
   Serial.print(F("\r\n\t\tBIOS call 0x"));
@@ -245,6 +260,7 @@ void BIOS::wboot() {
 
 // Console status to register A
 uint8_t BIOS::consts() {
+  tick();
   result = Serial.available() ? 0xFF : 0x00;
   cpu->regA(result);
   return result;
@@ -374,4 +390,16 @@ void BIOS::ioByte(uint8_t iobyte) {
   this->ioRDR = iobyte & 0x0C >> 2;
   this->ioPUN = iobyte & 0x30 >> 4;
   this->ioLST = iobyte & 0xC0 >> 6;
+}
+
+// Ticker
+void BIOS::tick() {
+  if (millis() > this->nextTick) {
+    ledOn();
+    // Set the next time
+    nextTick += 1000;
+    // LST file flush
+    drv->fsLST();
+    ledOff();
+  }
 }

@@ -39,9 +39,6 @@
 uint8_t callBDOS(int port);
 void    callBIOS(int port, int value);
 
-// Ticker interval
-const uint32_t tick = 1000;
-
 #ifdef SPI_RAM
 // SPI RAM
 SPIRAM ram(RS, RAM_BUFFER_SIZE);
@@ -89,11 +86,6 @@ uint8_t callBDOS(int port) {
   return bdos.call(port);
 }
 
-// Handler for one second ticker
-void callTicker() {
-  // LST file flush
-  drv.fsLST();
-}
 
 /**
   Main Arduino setup function
@@ -130,20 +122,14 @@ void setup() {
   Main Arduino loop
 */
 void loop() {
-  // The ticker
-  static uint32_t nextTick = millis();
-
   // Check the CPU state and run
   if (cpu.state) {
     cpu.instruction();
     //cpu.trace();
   }
 
-  // The ticker
-  if (millis() > nextTick) {
-    callTicker();
-    nextTick += tick;
-  }
+  // Ticker
+  bios.tick();
 
   //delay(100);
 }

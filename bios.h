@@ -97,6 +97,7 @@ class BIOS {
     void    sectran();
 
     void    ioByte(uint8_t iobyte);
+    void    tick();
 
     DPH_t   dph;
     DPB_t   dpb;
@@ -105,6 +106,9 @@ class BIOS {
     I8080   *cpu;
     RAM     *ram;
     DRIVE   *drv;
+
+    void    ledOn();
+    void    ledOff();
 
     void    signon();
     void    gocpm();
@@ -115,6 +119,8 @@ class BIOS {
     uint8_t ioRDR;
     uint8_t ioPUN;
     uint8_t ioLST;
+
+    uint32_t nextTick;
 };
 
 #endif /* BIOS_H */

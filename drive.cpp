@@ -145,11 +145,8 @@ bool DRIVE::loadCCP(bool verbose) {
   Create the user code directory
 */
 void DRIVE::mkDir(uint8_t drive, uint8_t user) {
-  char disk[] = "/A/0";
-  // Adjust the drive letter
-  disk[1] += (drive & 0x0F);
-  // Adjust the user hex code
-  disk[3] = toHEX(user);
+  // The path according to drive letter and user code
+  char disk[] = {'/', 'A' + (drive & 0x0F), '/', toHEX(user), '/', 0};
   // Build the path
   strncpy(fPath, bDir, 16);
   strncat(fPath, disk, 4);
@@ -165,9 +162,8 @@ void DRIVE::mkDir(uint8_t drive, uint8_t user) {
 */
 bool DRIVE::selDrive(uint8_t drive) {
   bool result = false;
-  char disk[] = "/A";
-  // Adjust the drive letter
-  disk[1] += (drive & 0x0F);
+  // The path according to drive letter
+  char disk[] = {'/', 'A' + (drive & 0x0F), 0};
   // Build the path
   strncpy(fPath, bDir, 16);
   strncat(fPath, disk, 4);
@@ -661,7 +657,7 @@ uint8_t DRIVE::fname2cname(char *fname, char *cname) {
     fname++;
   // Convert extension to uppercase and copy to CP/M type
   i = 0;
-  while (*fname != 0) {
+  while (*fname != 0 and i < 3) {
     *cname = toupper(*fname);
     fname++; cname++; i++;
   }

@@ -47,12 +47,12 @@ void MCURAM::flush(uint16_t addr) {
 
 uint8_t MCURAM::getByte(uint16_t addr) {
   // Directly return the byte from the buffer
-  return addr < MEM ? buf[addr] : 0xFF;
+  return addr <= LASTBYTE ? buf[addr] : 0xFF;
 }
 
 void MCURAM::setByte(uint16_t addr, uint8_t data) {
   // Directly set the byte into the buffer
-  if (addr < MEM)
+  if (addr <= LASTBYTE)
     buf[addr] = data;
 }
 

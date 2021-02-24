@@ -82,7 +82,7 @@ void SPIRAM::flush() {
   wrBuffer();
   // Reset the start and end addresses
   bufStart = LASTBYTE;
-  bufEnd = LASTBYTE;
+  bufEnd   = LASTBYTE;
 }
 
 // Flush the buffer, if dirty and the address is contained, and reset it
@@ -148,16 +148,17 @@ uint16_t SPIRAM::getWord(uint16_t addr) {
   // Change the buffer
   chBuffer(addr);
   // Directly return the byte from the buffer
-  return buf[addr - bufStart] +
-         buf[addr - bufStart + 1] * 0x0100;
+  uint16_t bufPos = addr - bufStart;
+  return buf[bufPos] + buf[bufPos + 1] * 0x0100;
 }
 
 void SPIRAM::setWord(uint16_t addr, uint16_t data) {
   // Change the buffer
   chBuffer(addr);
   // Directly set the byte into the buffer
-  buf[addr - bufStart]     = lowByte(data);
-  buf[addr - bufStart + 1] = highByte(data);
+  uint16_t bufPos = addr - bufStart;
+  buf[bufPos]     = lowByte(data);
+  buf[bufPos + 1] = highByte(data);
   bufDirty = true;
 }
 

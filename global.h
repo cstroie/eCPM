@@ -24,13 +24,21 @@
 
 /* Software name and version */
 #define PROGNAME    "eCPM"
-#define PROGVERS    "0.2.2"
+#define PROGVERS    "0.3.1"
 
 /* Memory size */
 #ifdef SPI_RAM
 #define MEMK        (64)
 #else
+#ifdef MMU_IRAM_HEAP
+#define MEM1K       (48)
+#define MEM2K       (12)
+#define MEMK        (MEM1K + MEM2K)
+#define MEM1        (MEM1K * 1024)
+#define MEM2        (MEM2K * 1024)
+#else
 #define MEMK        (48)
+#endif
 #endif
 #define MEM         (MEMK * 1024)
 #define LASTBYTE    (MEM - 1)

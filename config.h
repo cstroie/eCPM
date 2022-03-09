@@ -36,13 +36,17 @@
 #define BLS_2048
 
 // RAM cache size (bytes)
-#define RAM_BUFFER_SIZE  (4)
+#define RAM_BUFFER_SIZE  (8)
 
 // CCP file name
 #ifdef SPI_RAM
 #define CCP_FILE  ("CCP-DR64.BIN")
 #else
+#ifdef MMU_IRAM_HEAP
+#define CCP_FILE  ("CCP-DR60.BIN")
+#else
 #define CCP_FILE  ("CCP-DR48.BIN")
+#endif
 #endif
 
 // Serial port speed

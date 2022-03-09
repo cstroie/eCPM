@@ -21,6 +21,7 @@
 #define MCURAM_H
 
 #include <Arduino.h>
+#include <umm_malloc/umm_heap_select.h>
 #include "config.h"
 #include "global.h"
 
@@ -43,7 +44,8 @@ class MCURAM {
 
   private:
     // Buffer
-    uint8_t*  buf;
+    uint8_t*  buf;    // Primary buffer in DRAM
+    uint8_t*  ibuf;   // Secondary buffer in IRAM (optional)
 };
 
 #endif /* MCURAM_H */

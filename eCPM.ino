@@ -17,6 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <mmu_iram.h>
 
 #include <SPI.h>
 #include <SD.h>
@@ -105,6 +106,9 @@ void setup() {
   // Init the SPI RAM
   // FIXME This breaks the SPI
   //ram.init();
+#else
+  // Init additional RAM if possible
+  ram.init();
 #endif
   // Init the BIOS
   bios.init();

@@ -20,9 +20,9 @@
 #include "mcuram.h"
 
 MCURAM::MCURAM() {
-  // Allocate RAM
-#ifdef MEM1K
-  buf = (uint8_t*)malloc(MEM1K * 1024);
+  // Allocate RAM in DRAM
+#ifdef MMU_IRAM_HEAP
+  buf = (uint8_t*)malloc(DMEMK * 1024);
 #else
   buf = (uint8_t*)malloc(MEMK * 1024);
 #endif
@@ -33,11 +33,13 @@ MCURAM::~MCURAM() {
 }
 
 void MCURAM::init() {
-#ifdef MEM2K
-  Serial.print(F("eCPM: Using additional 12K of IRAM heap.\r\n"));
+#ifdef MMU_IRAM_HEAP
+  Serial.print(F("eCPM: Using additional "));
+  Serial.print(IMEMK);
+  Serial.print(F("K from IRAM.\r\n"));
   {
     HeapSelectIram ephemeral;
-    ibuf = (uint8_t*)malloc(MEM2K * 1024);
+    ibuf = (uint8_t*)malloc(IMEMK * 1024);
   }
 #endif
 }
@@ -57,21 +59,26 @@ void MCURAM::flush(uint16_t addr) {
 }
 
 uint8_t MCURAM::getByte(uint16_t addr) {
-  // Directly return the byte from the buffer
-#ifdef MEM1K
-  return (addr <= MEM1) ? buf[addr] : (addr <= LASTBYTE ? ibuf[addr - MEM1] : 0xFF);
+  // Return one byte from the correct buffer
+#ifdef MMU_IRAM_HEAP
+  if (addr < DMEM)
+    return buf[addr];
+  else if (addr <= LASTBYTE)
+    return ibuf[addr - DMEM];
+  else
+    return 0xFF;
 #else
   return addr <= LASTBYTE ? buf[addr] : 0xFF;
 #endif
 }
 
 void MCURAM::setByte(uint16_t addr, uint8_t data) {
-  // Directly set the byte into the buffer
-#ifdef MEM1K
-  if (addr <= MEM1)
+  // Set one byte into the correct buffer
+#ifdef MMU_IRAM_HEAP
+  if (addr < DMEM)
     buf[addr] = data;
   else if (addr <= LASTBYTE)
-    ibuf[addr - MEM1] = data;
+    ibuf[addr - DMEM] = data;
 #else
   if (addr <= LASTBYTE)
     buf[addr] = data;
@@ -79,26 +86,39 @@ void MCURAM::setByte(uint16_t addr, uint8_t data) {
 }
 
 uint16_t MCURAM::getWord(uint16_t addr) {
-  // Directly return the byte from the buffer
-  // FIXME
-#ifdef MEM1K
-  return (addr < MEM1) ? (buf[addr] + buf[addr + 1] * 0x0100) : (addr < LASTBYTE ? (ibuf[addr - MEM1] + ibuf[addr - MEM1 + 1] * 0x0100) : 0xFFFF);
+  // Return one word from the correct buffer
+#ifdef MMU_IRAM_HEAP
+  if (addr < DMEM - 1)
+    return buf[addr] + buf[addr + 1] * 0x0100;
+  else if (addr == DMEM)
+    return buf[DMEM] + ibuf[0] * 0x0100;
+  else if (addr < LASTBYTE) {
+    uint16_t idx = addr - DMEM;
+    return ibuf[idx] + ibuf[idx + 1] * 0x0100;
+  }
+  else
+    return 0xFFFF;
 #else
   return addr < LASTBYTE ? (buf[addr] + buf[addr + 1] * 0x0100) : 0xFFFF;
 #endif
 }
 
 void MCURAM::setWord(uint16_t addr, uint16_t data) {
-  // Directly set the byte into the buffer
-  // FIXME
-#ifdef MEM1K
-  if (addr < MEM1) {
+  // Set one word into the correct buffer
+#ifdef MMU_IRAM_HEAP
+  if (addr < DMEM - 1) {
     buf[addr]     = lowByte(data);
     buf[addr + 1] = highByte(data);
+
+  }
+  else if (addr == DMEM) {
+    buf[DMEM]     = lowByte(data);
+    ibuf[0]       = highByte(data);
   }
   else if (addr < LASTBYTE) {
-    ibuf[addr - MEM1]     = lowByte(data);
-    ibuf[addr - MEM1 + 1] = highByte(data);
+    uint16_t idx = addr - DMEM;
+    ibuf[addr - DMEM]     = lowByte(data);
+    ibuf[addr - DMEM + 1] = highByte(data);
   }
 #else
   if (addr < LASTBYTE) {
@@ -109,27 +129,13 @@ void MCURAM::setWord(uint16_t addr, uint16_t data) {
 }
 
 void MCURAM::read(uint16_t addr, uint8_t *data, uint16_t len) {
-  // FIXME
-#ifdef MEM1K
-  if (addr + len <= MEM1)
-    memcpy(data, &buf[addr], len);
-  else if (addr > MEM1)
-    memcpy(data, &ibuf[addr - MEM1], len);
-#else
-  memcpy(data, &buf[addr], len);
-#endif
+  for (uint16_t i = 0; i < len; i++)
+    data[i] = getByte(addr++);
 }
 
 void MCURAM::write(uint16_t addr, uint8_t *data, uint16_t len) {
-  // FIXME
-#ifdef MEM1K
-  if (addr + len <= MEM1)
-    memcpy(&buf[addr], data, len);
-  else if (addr > MEM1)
-    memcpy(&ibuf[addr - MEM1], data, len);
-#else
-  memcpy(&buf[addr], data, len);
-#endif
+  for (uint16_t i = 0; i < len; i++)
+    setByte(addr++, data[i]);
 }
 
 void MCURAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
@@ -157,7 +163,7 @@ void MCURAM::hexdump(uint16_t start, uint16_t stop, char* comment) {
     for (uint8_t set = 0; set < 2; set++) {
       for (uint8_t byt = 0; byt < 8; byt++) {
         // Read data
-        data = buf[addr];
+        data = getByte(addr);
         // Prepare and print the hex dump
         sprintf_P(val, PSTR("%02X "), data);
         Serial.print(val);

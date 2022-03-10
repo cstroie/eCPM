@@ -28,20 +28,23 @@
 
 /* Memory size */
 #ifdef SPI_RAM
-#define MEMK        (64)
+#  define MEMK          (64)
 #else
-#ifdef MMU_IRAM_HEAP
-#define MEM1K       (48)
-#define MEM2K       (12)
-#define MEMK        (MEM1K + MEM2K)
-#define MEM1        (MEM1K * 1024)
-#define MEM2        (MEM2K * 1024)
-#else
-#define MEMK        (48)
+#  ifdef MMU_IRAM_HEAP
+#    define DMEMK       (48)            // DRAM
+#    define IMEMK       (16)            // IRAM
+#    define MEMK        (DMEMK + IMEMK)
+#    define DMEM        (DMEMK * 1024)
+#    define IMEM        (IMEMK * 1024)
+#  else
+#    define MEMK        (48)
+#  endif
 #endif
-#endif
-#define MEM         (MEMK * 1024)
-#define LASTBYTE    (MEM - 1)
+#define MEM             (MEMK * 1024)
+#define LASTBYTE        (MEM - 1)
+
+// CCP file name
+#define CCP_FILE        (PSTR("CCP-DR%02d.BIN"))
 
 // Memory definitions                           64K    48K
 #define BIOSCODE    (MEM - 0x0200)        // 0xFE00 0xBE00

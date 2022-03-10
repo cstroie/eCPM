@@ -17,8 +17,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <mmu_iram.h>
-
 #include <SPI.h>
 #include <SD.h>
 
@@ -28,9 +26,9 @@
 #include "global.h"
 
 #ifdef SPI_RAM
-#include "spiram.h"
+#  include "spiram.h"
 #else
-#include "mcuram.h"
+#  include "mcuram.h"
 #endif
 #include "i8080.h"
 #include "bios.h"
@@ -96,8 +94,10 @@ void setup() {
   pinMode(LED, OUTPUT);
   digitalWrite(LED, LOW ^ LEDinv);
   // Serial port configuration
+  Serial.flush();
   Serial.begin(SERIAL_SPEED);
-  Serial.print(F("\r\n\r\n"));
+  Serial.print(F("\r\n"));
+  Serial.print(F("\r\n"));
   // SPI
   SPI.begin();
   // Init the DRIVE

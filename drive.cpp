@@ -20,8 +20,8 @@
 #include <SPI.h>
 #include "drive.h"
 
-long int timeCallback() {
-  return 1601984632;
+time_t timeCallback() {
+  return 1633123449UL;
 }
 
 DRIVE::DRIVE(RAM *ram, char *bdir): ram(ram), bDir(bdir) {
@@ -37,7 +37,8 @@ void DRIVE::init() {
   bool result;
   Serial.print(F("eCPM: Initializing SD card: "));
 #ifdef ESP8266
-  result = SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
+  result = SD.begin(SS);
+  //result = SD.begin(SS, SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
 #else
   result = SD.begin(SS);
 #endif
@@ -100,7 +101,8 @@ bool DRIVE::loadCCP(bool verbose) {
   // Build the path
   strncpy(fPath, bDir, 16);
   strcat(fPath, "/");
-  strcat(fPath, CCP_FILE);
+  sprintf_P((char*)buf, CCP_FILE, MEMK);
+  strcat(fPath, (char*)buf);
   if (verbose) {
     // Message
     Serial.print(F("eCPM: Loading "));

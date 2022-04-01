@@ -20,10 +20,26 @@
 #include "bios.h"
 
 // BIOS CALLS
-const char* BIOS_CALLS[] = {"BOOT", "WBOOT", "CONST", "CONIN", "CONOUT", "LIST",
-                            "PUNCH", "READER", "HOME", "SELDSK", "SETTRK", "SETSEC",
-                            "SETDMA", "READ", "WRITE", "LISTST", "SECTRN"
-                           };
+const char BIOS_00[] PROGMEM = "BOOT";
+const char BIOS_01[] PROGMEM = "WBOOT";
+const char BIOS_02[] PROGMEM = "CONST";
+const char BIOS_03[] PROGMEM = "CONIN";
+const char BIOS_04[] PROGMEM = "CONOUT";
+const char BIOS_05[] PROGMEM = "LIST";
+const char BIOS_06[] PROGMEM = "PUNCH";
+const char BIOS_07[] PROGMEM = "READER";
+const char BIOS_08[] PROGMEM = "HOME";
+const char BIOS_09[] PROGMEM = "SELDSK";
+const char BIOS_0A[] PROGMEM = "SETTRK";
+const char BIOS_0B[] PROGMEM = "SETSEC";
+const char BIOS_0C[] PROGMEM = "SETDMA";
+const char BIOS_0D[] PROGMEM = "READ";
+const char BIOS_0E[] PROGMEM = "WRITE";
+const char BIOS_0F[] PROGMEM = "LISTST";
+const char BIOS_10[] PROGMEM = "SECTRN";
+const char* const BIOS_CALLS[] PROGMEM = {BIOS_00, BIOS_01, BIOS_02, BIOS_03, BIOS_04, BIOS_05, BIOS_06, BIOS_07,
+                                          BIOS_08, BIOS_09, BIOS_0A, BIOS_0B, BIOS_0C, BIOS_0D, BIOS_0E, BIOS_0F, BIOS_10
+                                         };
 
 BIOS::BIOS(I8080 *cpu, RAM *ram, DRIVE *drv): cpu(cpu), ram(ram), drv(drv) {
 }
@@ -134,8 +150,10 @@ void BIOS::call(uint16_t code) {
   Serial.print(F("\r\n\t\tBIOS call 0x"));
   Serial.print(code, HEX);
   if (code <= 17) {
+    char buf[8]; 
     Serial.print("\t");
-    Serial.print(BIOS_CALLS[code]);
+    strcpy_P(buf, (char*)pgm_read_dword(&(BIOS_CALLS[code])));
+    Serial.print(buf);
   }
   Serial.print(F("\r\n"));
   cpu->trace();
@@ -232,7 +250,7 @@ void BIOS::call(uint16_t code) {
       // Show unimplemented BIOS calls only when debugging
       Serial.print(F("\r\nUnimplemented BIOS call: 0x"));
       Serial.print(code, HEX);
-      Serial.print(F("\r\n"));
+      Serial.print("\r\n");
       cpu->trace();
 #endif
       break;
@@ -395,11 +413,9 @@ void BIOS::ioByte(uint8_t iobyte) {
 // Ticker
 void BIOS::tick() {
   if (millis() > this->nextTick) {
-    ledOn();
     // Set the next time
     nextTick += 1000;
     // LST file flush
     drv->fsLST();
-    ledOff();
   }
 }

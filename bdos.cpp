@@ -20,17 +20,56 @@
 #include "bdos.h"
 
 // BDOS CALLS
-const char* BDOS_CALLS[] = {"WBOOT", "GETCON", "OUTCON", "GETRDR", "PUNCH", "LIST",
-                            "DIRCIO", "GETIOB", "SETIOB", "PRTSTR", "RDBUFF", "GETCSTS",
-                            "GETVER", "RSTDSK", "SETDSK", "OPENFIL", "CLOSEFIL",
-                            "GETFST", "GETNXT", "DELFILE", "READSEQ", "WRTSEQ",
-                            "FCREATE", "RENFILE", "GETLOG", "GETCRNT", "PUTDMA",
-                            "GETALOC", "WRTPRTD", "GETROV", "SETATTR", "GETPARM",
-                            "GETUSER", "RDRANDOM", "WTRANDOM", "FILESIZE", "SETRAN",
-                            "LOGOFF", "RTN", "RTN", "WTSPECL",
-                           };
+const char BDOS_00[] PROGMEM = "WBOOT";
+const char BDOS_01[] PROGMEM = "GETCON";
+const char BDOS_02[] PROGMEM = "OUTCON";
+const char BDOS_03[] PROGMEM = "GETRDR";
+const char BDOS_04[] PROGMEM = "PUNCH";
+const char BDOS_05[] PROGMEM = "LIST";
+const char BDOS_06[] PROGMEM =  "DIRCIO";
+const char BDOS_07[] PROGMEM = "GETIOB";
+const char BDOS_08[] PROGMEM = "SETIOB";
+const char BDOS_09[] PROGMEM = "PRTSTR";
+const char BDOS_0A[] PROGMEM = "RDBUFF";
+const char BDOS_0B[] PROGMEM = "GETCSTS";
+const char BDOS_0C[] PROGMEM = "GETVER";
+const char BDOS_0D[] PROGMEM = "RSTDSK";
+const char BDOS_0E[] PROGMEM = "SETDSK";
+const char BDOS_0F[] PROGMEM = "OPENFIL";
+const char BDOS_10[] PROGMEM = "CLOSEFIL";
+const char BDOS_11[] PROGMEM = "GETFST";
+const char BDOS_12[] PROGMEM = "GETNXT";
+const char BDOS_13[] PROGMEM = "DELFILE";
+const char BDOS_14[] PROGMEM = "READSEQ";
+const char BDOS_15[] PROGMEM = "WRTSEQ";
+const char BDOS_16[] PROGMEM = "FCREATE";
+const char BDOS_17[] PROGMEM = "RENFILE";
+const char BDOS_18[] PROGMEM = "GETLOG";
+const char BDOS_19[] PROGMEM = "GETCRNT";
+const char BDOS_1A[] PROGMEM = "PUTDMA";
+const char BDOS_1B[] PROGMEM = "GETALOC";
+const char BDOS_1C[] PROGMEM = "WRTPRTD";
+const char BDOS_1D[] PROGMEM = "GETROV";
+const char BDOS_1E[] PROGMEM = "SETATTR";
+const char BDOS_1F[] PROGMEM = "GETPARM";
+const char BDOS_20[] PROGMEM = "GETUSER";
+const char BDOS_21[] PROGMEM = "RDRANDOM";
+const char BDOS_22[] PROGMEM = "WTRANDOM";
+const char BDOS_23[] PROGMEM = "FILESIZE";
+const char BDOS_24[] PROGMEM = "SETRAN";
+const char BDOS_25[] PROGMEM = "LOGOFF";
+const char BDOS_26[] PROGMEM = "RTN";
+const char BDOS_27[] PROGMEM = "RTN";
+const char BDOS_28[] PROGMEM = "WTSPECL";
+const char* const BDOS_CALLS[] PROGMEM = {BDOS_00, BDOS_01, BDOS_02, BDOS_03, BDOS_04, BDOS_05, BDOS_06, BDOS_07,
+                                          BDOS_08, BDOS_09, BDOS_0A, BDOS_0B, BDOS_0C, BDOS_0D, BDOS_0E, BDOS_0F,
+                                          BDOS_10, BDOS_11, BDOS_12, BDOS_13, BDOS_14, BDOS_15, BDOS_16, BDOS_17,
+                                          BDOS_18, BDOS_19, BDOS_1A, BDOS_1B, BDOS_1C, BDOS_1D, BDOS_1E, BDOS_1F,
+                                          BDOS_20, BDOS_21, BDOS_22, BDOS_23, BDOS_24, BDOS_25, BDOS_26, BDOS_27,
+                                          BDOS_28
+                                         };
 
-BDOS::BDOS(I8080 *cpu, RAM *ram, DRIVE *drv, BIOS *bios): cpu(cpu), ram(ram), drv(drv), bios(bios) {
+BDOS::BDOS(I8080 * cpu, RAM * ram, DRIVE * drv, BIOS * bios): cpu(cpu), ram(ram), drv(drv), bios(bios) {
 }
 
 BDOS::~BDOS() {
@@ -81,8 +120,10 @@ uint8_t BDOS::call(uint16_t port) {
   Serial.print(F("\r\n\t\tBDOS call 0x"));
   Serial.print(func, HEX);
   if (func <= 41) {
+    char buf[8];
     Serial.print("\t");
-    Serial.print(BDOS_CALLS[func]);
+    strcpy_P(buf, (char*)pgm_read_dword(&(BDOS_CALLS[func])));
+    Serial.print(buf);
   }
   Serial.print(F("\r\n"));
   cpu->trace();
@@ -784,7 +825,7 @@ uint8_t BDOS::call(uint16_t port) {
     default:
 #ifdef DEBUG_BDOS_CALLS
       // Show unimplemented BDOS calls only when debugging
-      Serial.print("\r\nUnimplemented BDOS call 0x");
+      Serial.print(F("\r\nUnimplemented BDOS call 0x"));
       Serial.print(func, HEX);
       Serial.print("\r\n");
       cpu->trace();
@@ -805,21 +846,21 @@ uint8_t BDOS::call(uint16_t port) {
 
 // Display and return the error
 void BDOS::bdosError(uint8_t err) {
-  Serial.print("\r\nBdos Err On ");
+  Serial.print(F("\r\nBdos Err On "));
   Serial.print((char)(cDrive + 'A'));
-  Serial.print(" : ");
+  Serial.print(F(" : "));
   switch (err) {
     case 1:
-      Serial.print("Bad Sector");
+      Serial.print(F("Bad Sector"));
       break;
     case 2:
-      Serial.print("Select");
+      Serial.print(F("Select"));
       break;
     case 3:
-      Serial.print("File R/O");
+      Serial.print(F("File R/O"));
       break;
     case 4:
-      Serial.print("R/O");
+      Serial.print(F("R/O"));
       break;
   }
   Serial.print("\r\n");
@@ -869,7 +910,7 @@ void BDOS::showFCB(const char* comment) {
     Serial.print("\r\n; ");
     Serial.print(comment);
   }
-  Serial.print("\r\nDR FN       TP   EX S1 S2 RC CR R0 R1 R2");
+  Serial.print(F("\r\nDR FN       TP   EX S1 S2 RC CR R0 R1 R2"));
   Serial.print("\r\n ");
   Serial.print((char)(fcb.dr == 0 ? '*' : ((fcb.dr == '?') ? '?' : (fcb.dr + 'A' - 1))));
   Serial.print(' ');
@@ -964,7 +1005,7 @@ void BDOS::dirEntry(char *cname, uint8_t uid, uint32_t fsize) {
 
 #ifdef DEBUG_DIRENTRY
   char buf[80];
-  Serial.print("\r\nUU FN       TP   EX S1 S2 RC");
+  Serial.print(F("\r\nUU FN       TP   EX S1 S2 RC"));
   Serial.print("\r\n ");
   Serial.print((char)(toHEX(de.uu)));
   Serial.print(' ');

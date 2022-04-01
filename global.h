@@ -24,7 +24,7 @@
 
 /* Software name and version */
 #define PROGNAME    "eCPM"
-#define PROGVERS    "0.3.1"
+#define PROGVERS    "0.3.2"
 
 /* Memory size */
 #ifdef SPI_RAM

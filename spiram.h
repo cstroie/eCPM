@@ -28,6 +28,7 @@
 // SPI RAM commands
 enum SPIRAM_CMNDS {CMD_WRMR  = 0x01, CMD_RDMR = 0x05,
                    CMD_WRITE = 0x02, CMD_READ = 0x03,
+                   CMD_EDIO  = 0x3B, CMD_EQIO = 0x38,
                    CMD_RSTIO = 0xFF
                   };
 // SPI RAM transfer modes

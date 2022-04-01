@@ -509,14 +509,31 @@ bool DRIVE::rename(char* cname, char* newname) {
   char *fname, *nfname;
   // Remove the existing file
   remove(newname);
-  // Build the path
+  // Build the paths
   fname = cname + FNHOST;
   cname2fname(cname, fname);
   nfname = newname + FNHOST;
   cname2fname(newname, nfname);
+  // The two file handlers
+  File frFile, toFile;
   ledOn();
-  if (SD.exists(fname))
-    SD.rename(fname, nfname);
+  if (SD.exists(fname)) {
+    if (frFile = SD.open(fname, FILE_READ)) {
+      if (toFile = SD.open(nfname, FILE_WRITE)) {
+        uint8_t len;
+        uint8_t buf[128];
+        while ((len = frFile.read(buf, sizeof(buf))) > 0) {
+          toFile.write(buf, len);
+        }
+        toFile.close();
+      }
+      frFile.close();
+    }
+    // Remove the old file
+    if (SD.exists(nfname) and SD.exists(fname))
+      SD.remove(fname);
+    //SD.rename(fname, nfname);
+  }
   ledOff();
   return result;
 }

@@ -21,7 +21,9 @@
 #define MCURAM_H
 
 #include <Arduino.h>
+#ifdef MMU_IRAM_HEAP
 #include <umm_malloc/umm_heap_select.h>
+#endif
 #include "config.h"
 #include "global.h"
 

@@ -59,6 +59,16 @@ eCPM organizes files on the SD card using a drive/user directory structure:
 
 This eliminates the need for traditional CP/M disk images while maintaining compatibility.
 
+## Sample SD Card Content
+
+The `data/` directory contains a ready-to-copy SD card image with sample CP/M software, organized by drive and user area:
+
+- **`CCP-DR48.BIN`** — the Digital Research CCP binary built for the 48K memory configuration, loaded by eCPM at boot
+- **`A/0/`** — core utilities and tools: `ASM.COM`/`DDT.COM`/`DDTZ.COM` (assembler and debuggers), `ED.COM`/`ZDE.COM` (editors), `WM.COM` (WordStar, with `WM.HLP`), `STAT.COM`/`DSTAT80.COM`/`DDIR.COM`/`LS.COM`/`D.COM` (status and directory listing), `PIP.COM` (file copy), `DUMP.COM`/`DIF.COM`/`CRC.COM` (file inspection/comparison), `XMODEM.COM`/`KERMIT.COM` (serial file transfer), `SUBMIT.COM`/`XSUB.COM` (batch command files), `LOAD.COM`, `MORE.COM`, `S.COM`, `SPEED.COM`, `SURVEY.COM`, `TELL.COM`, `XR.COM`, `XS.COM`
+- **`G/0/`** — Infocom's Zork trilogy (`ZORK1`–`ZORK3`, each a `.COM` interpreter plus its `.DAT` story file)
+
+Copy the contents of `data/` to the root of the SD card to have these available immediately after flashing eCPM.
+
 ## Supported Applications
 
 eCPM can run a wide variety of classic CP/M software including:
@@ -66,7 +76,7 @@ eCPM can run a wide variety of classic CP/M software including:
 - **Text Editors**: WordStar, ED, ZDE
 - **Programming Languages**: MBASIC, Z80ASM, L80
 - **Utilities**: DDT, STAT, PIP
-- **Games**: Text adventures and simple arcade games
+- **Games**: Text adventures (Zork I-III) and simple arcade games
 - **Business Software**: dBase, SuperCalc (with memory constraints)
 
 ## Building and Installation
